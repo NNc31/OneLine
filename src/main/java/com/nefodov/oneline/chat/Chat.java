@@ -1,31 +1,43 @@
 package com.nefodov.oneline.chat;
 
-import com.nefodov.oneline.user.User;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 
 @Entity
 @Table(name = "chats")
+@Getter
+@Setter
+@NoArgsConstructor
 public class Chat {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String accessToken;
+    @Column(name = "chat_token_hash", nullable = false, unique = true)
+    private byte[] chatTokenHash;
 
-    @ManyToOne(optional = false)
-    private User inviter;
+    @Column(length = 120)
+    private String name;
 
-    @ManyToOne(optional = false)
-    private User invitee;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 
-    @Column(nullable = false)
-    private boolean active = true;
+    @Column(name = "closed_at")
+    private Instant closedAt;
 
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+
+    public boolean isClosed() {
+        return closedAt != null;
+    }
 }
-

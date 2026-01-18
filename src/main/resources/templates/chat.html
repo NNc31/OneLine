@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${chatName != null ? chatName + ' · OneLine' : 'OneLine'}">OneLine</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/theme.js}"></script>
+</head>
+<body class="chat-page">
+<header class="chat-header">
+    <div class="inner">
+        <a th:href="@{/}" class="brand">OneLine</a>
+        <span class="chat-title" th:if="${chatName != null}" th:text="${chatName}">name</span>
+        <span class="chat-title" th:if="${chatName == null}"></span>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle theme">Theme</button>
+        <span class="me" th:if="${authenticated}" th:text="${me.displayName}">me</span>
+    </div>
+</header>
+<main class="chat-main">
+    <div class="inner">
+        <section th:if="${!authenticated}" class="join-card">
+            <h2>Pick a name</h2>
+            <form method="post" th:action="@{|/c/${chatToken}/join|}">
+                <input type="text" name="displayName" maxlength="40" required autofocus placeholder="e.g. Ethan, Agent A, etc.">
+                <button type="submit" class="primary">Join chat</button>
+            </form>
+        </section>
+        <section th:if="${authenticated}"
+                 class="chat-room"
+                 th:attr="data-chat-id=${chatId},data-chat-token=${chatToken},data-me-id=${me.id}">
+            <ul id="messages" class="messages">
+                <li th:each="m : ${history}"
+                    class="message"
+                    th:classappend="${m.participantId == me.id} ? 'mine'"
+                    th:attr="data-message-id=${m.id}">
+                    <span class="author" th:text="${m.displayName}">name</span>
+                    <span class="body" th:text="${m.content}">text</span>
+                    <time th:datetime="${m.createdAt}" th:text="${#temporals.format(m.createdAt, 'HH:mm')}">00:00</time>
+                </li>
+            </ul>
+        </section>
+    </div>
+</main>
+
+<form th:if="${authenticated}" id="send-form" class="send" autocomplete="off">
+    <input id="send-input" type="text" name="content" maxlength="4000" required placeholder="Type something" autofocus>
+    <button type="submit" class="primary">Send</button>
+</form>
+<div th:if="${authenticated}" id="conn-status" class="conn-status" data-state="connecting">Connecting...</div>
+
+<script th:if="${authenticated}" src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+<script th:if="${authenticated}" th:src="@{/js/app.js}" defer></script>
+</body>
+</html>

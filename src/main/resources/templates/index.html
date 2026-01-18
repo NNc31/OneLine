@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OneLine</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/theme.js}"></script>
+</head>
+<body class="landing">
+<main>
+    <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle theme">Theme</button>
+    <h1>OneLine</h1>
+    <p class="lede">Your chat is your link. Your link is your access.</p>
+    <form method="post" th:action="@{/new}">
+        <button type="submit" class="primary">Create chat</button>
+    </form>
+</main>
+</body>
+</html>
