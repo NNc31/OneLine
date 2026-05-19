@@ -16,47 +16,40 @@ public class MessageService {
 
     private static final int DEFAULT_HISTORY_LIMIT = 50;
     private static final int MAX_HISTORY_LIMIT = 200;
-    private static final int MAX_CONTENT_LENGTH = 4000;
+    private static final int MAX_CONTENT_LENGTH = 8192;
 
     private final MessageRepository messageRepository;
-    private final MessageContentCodec contentCodec;
 
     @Transactional
-    public StoredMessage send(ChatSession session, UUID clientMessageId, String content) {
+    public Message send(ChatSession session, UUID clientMessageId, byte[] content) {
         validateContent(content);
         Chat chat = session.chat();
-        byte[] key = session.messageKey();
-        return messageRepository.findByChatAndClientMessageId(chat, clientMessageId)
-                .map(existing -> new StoredMessage(existing, contentCodec.decode(key, existing.getContent())))
-                .orElseGet(() -> persist(session, clientMessageId, content));
+        return messageRepository.findByChatAndClientMessageId(chat, clientMessageId).orElseGet(() -> persist(session, clientMessageId, content));
     }
 
     @Transactional(readOnly = true)
-    public List<StoredMessage> history(ChatSession session, Long beforeId, Integer limit) {
+    public List<Message> history(ChatSession session, Long beforeId, Integer limit) {
         Chat chat = session.chat();
-        byte[] key = session.messageKey();
         int effectiveLimit = resolveHistoryLimit(limit);
-        List<Message> rows = beforeId == null
+        return beforeId == null
                 ? messageRepository.findByChatOrderByIdDesc(chat, Limit.of(effectiveLimit))
                 : messageRepository.findByChatAndIdLessThanOrderByIdDesc(chat, beforeId, Limit.of(effectiveLimit));
-        return rows.stream().map(m -> new StoredMessage(m, contentCodec.decode(key, m.getContent()))).toList();
     }
 
-    private StoredMessage persist(ChatSession session, UUID clientMessageId, String content) {
+    private Message persist(ChatSession session, UUID clientMessageId, byte[] content) {
         Message message = new Message();
         message.setChat(session.chat());
         message.setParticipant(session.participant());
         message.setClientMessageId(clientMessageId);
-        message.setContent(contentCodec.encode(session.messageKey(), content));
-        Message saved = messageRepository.save(message);
-        return new StoredMessage(saved, content);
+        message.setContent(content);
+        return messageRepository.save(message);
     }
 
-    private void validateContent(String content) {
-        if (content == null || content.isBlank()) {
+    private void validateContent(byte[] content) {
+        if (content == null || content.length == 0) {
             throw new IllegalArgumentException("Message content is required");
         }
-        if (content.length() > MAX_CONTENT_LENGTH) {
+        if (content.length > MAX_CONTENT_LENGTH) {
             throw new IllegalArgumentException("Message content is too long");
         }
     }
@@ -65,9 +58,6 @@ public class MessageService {
         if (requested == null) {
             return DEFAULT_HISTORY_LIMIT;
         }
-        return Math.max(1, Math.min(MAX_HISTORY_LIMIT, requested));
-    }
-
-    public record StoredMessage(Message message, String plaintext) {
+        return Math.clamp(requested, 1, MAX_HISTORY_LIMIT);
     }
 }

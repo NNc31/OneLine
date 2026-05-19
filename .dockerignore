@@ -1,0 +1,11 @@
+.git
+.gradle
+build
+out
+.idea
+*.iml
+*.log
+.DS_Store
+node_modules
+README.md
+LICENSE

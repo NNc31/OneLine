@@ -1,17 +1,47 @@
-version: "3.8"
-
 services:
   postgres:
     image: postgres:16
     container_name: oneline-postgres
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_DB: oneline_db
       POSTGRES_USER: oneline_user
       POSTGRES_PASSWORD: oneline_pass
     volumes:
       - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oneline_user -d oneline_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: oneline-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: oneline-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/oneline_db
+      DB_USER: oneline_user
+      DB_PASSWORD: oneline_pass
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+    ports:
+      - "8080:8080"
 
 volumes:
   pg_data:

@@ -6,7 +6,7 @@ public record MessageResponse(
         Long id,
         Long participantId,
         String displayName,
-        String content,
+        byte[] content,
         Instant createdAt
 ) {
 }

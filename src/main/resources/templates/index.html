@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>OneLine</title>
+    <link rel="icon" th:href="@{/favicon.svg}" type="image/svg+xml">
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <script th:src="@{/js/theme.js}"></script>
 </head>
@@ -15,6 +16,7 @@
     <form method="post" th:action="@{/new}">
         <button type="submit" class="primary">Create chat</button>
     </form>
+    <p class="muted-link"><a th:href="@{/me}">Session chats</a></p>
 </main>
 </body>
 </html>

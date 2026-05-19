@@ -3,53 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="${chatName != null ? chatName + ' · OneLine' : 'OneLine'}">OneLine</title>
+    <title>OneLine</title>
+    <link rel="icon" th:href="@{/favicon.svg}" type="image/svg+xml">
     <link rel="stylesheet" th:href="@{/css/app.css}">
     <script th:src="@{/js/theme.js}"></script>
+    <script th:src="@{/js/sound.js}"></script>
 </head>
 <body class="chat-page">
+
 <header class="chat-header">
     <div class="inner">
         <a th:href="@{/}" class="brand">OneLine</a>
-        <span class="chat-title" th:if="${chatName != null}" th:text="${chatName}">name</span>
-        <span class="chat-title" th:if="${chatName == null}"></span>
+        <a th:href="@{/me}" class="brand-link">Session chats</a>
+        <span class="spacer"></span>
+        <button type="button" class="theme-toggle" data-sound-toggle aria-label="Toggle sound">Sound</button>
         <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle theme">Theme</button>
-        <span class="me" th:if="${authenticated}" th:text="${me.displayName}">me</span>
+        <span id="me-badge" class="me" hidden></span>
     </div>
 </header>
+
 <main class="chat-main">
-    <div class="inner">
-        <section th:if="${!authenticated}" class="join-card">
+    <div class="inner" th:attr="data-public-id=${publicId}">
+
+        <section id="missing-secret" class="join-card" hidden>
+            <h2>Missing access</h2>
+            <p>The link you opened doesn't contain a secret. Ask whoever shared it to send the
+                full URL — the part after <code>#</code> is the access token.</p>
+        </section>
+
+        <section id="join-card" class="join-card" hidden>
             <h2>Pick a name</h2>
-            <form method="post" th:action="@{|/c/${chatToken}/join|}">
-                <input type="text" name="displayName" maxlength="40" required autofocus placeholder="e.g. Ethan, Agent A, etc.">
+            <form id="join-form">
+                <input type="text" id="join-display-name" maxlength="40" required autofocus
+                       placeholder="e.g. Ethan, Agent A, etc.">
                 <button type="submit" class="primary">Join chat</button>
             </form>
+            <p id="join-error" class="error-message" hidden></p>
         </section>
-        <section th:if="${authenticated}"
-                 class="chat-room"
-                 th:attr="data-chat-id=${chatId},data-chat-token=${chatToken},data-me-id=${me.id}">
-            <ul id="messages" class="messages">
-                <li th:each="m : ${history}"
-                    class="message"
-                    th:classappend="${m.participantId == me.id} ? 'mine'"
-                    th:attr="data-message-id=${m.id}">
-                    <span class="author" th:text="${m.displayName}">name</span>
-                    <span class="body" th:text="${m.content}">text</span>
-                    <time th:datetime="${m.createdAt}" th:text="${#temporals.format(m.createdAt, 'HH:mm')}">00:00</time>
-                </li>
-            </ul>
+
+        <section id="chat-room" class="chat-room" hidden>
+            <ul id="messages" class="messages"></ul>
         </section>
+
     </div>
 </main>
 
-<form th:if="${authenticated}" id="send-form" class="send" autocomplete="off">
-    <input id="send-input" type="text" name="content" maxlength="4000" required placeholder="Type something" autofocus>
+<form id="send-form" class="send" autocomplete="off" hidden>
+    <input id="send-input" type="text" name="content" maxlength="4000" required placeholder="Type something" autocomplete="off">
     <button type="submit" class="primary">Send</button>
 </form>
-<div th:if="${authenticated}" id="conn-status" class="conn-status" data-state="connecting">Connecting...</div>
+<div id="conn-status" class="conn-status" data-state="connecting" hidden>Connecting...</div>
 
-<script th:if="${authenticated}" src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
-<script th:if="${authenticated}" th:src="@{/js/app.js}" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+<script th:src="@{/js/crypto.js}"></script>
+<script th:src="@{/js/app.js}" defer></script>
+
 </body>
 </html>

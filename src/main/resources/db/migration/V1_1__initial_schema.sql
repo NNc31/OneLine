@@ -1,7 +1,6 @@
 CREATE TABLE chats (
     id                  BIGSERIAL PRIMARY KEY,
     chat_token_hash     BYTEA NOT NULL UNIQUE,
-    name                VARCHAR(120),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     closed_at           TIMESTAMPTZ
 );

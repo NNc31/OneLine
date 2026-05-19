@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "chats")
@@ -18,11 +19,11 @@ public class Chat {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false)
+    private UUID publicId;
+
     @Column(name = "chat_token_hash", nullable = false, unique = true)
     private byte[] chatTokenHash;
-
-    @Column(length = 120)
-    private String name;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

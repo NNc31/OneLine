@@ -9,6 +9,10 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
   flyway:
     enabled: true
 
@@ -20,8 +24,6 @@ oneline:
     cookie-secure: false
     cookie-same-site: Lax
     cookie-max-age: P30D
-  crypto:
-    algorithm: aes-gcm
   rate-limit:
     create-chat:
       capacity: 5
@@ -29,3 +31,10 @@ oneline:
     join:
       capacity: 10
       refill-period: PT1M
+    message:
+      capacity: 25
+      refill-period: PT10S
+  retention:
+    inactivity-window: P365D
+    cron: "0 0 3 * * *"
+    zone: "GMT+03:00"

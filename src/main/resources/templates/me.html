@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Session chats · OneLine</title>
+    <link rel="icon" th:href="@{/favicon.svg}" type="image/svg+xml">
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+    <script th:src="@{/js/theme.js}"></script>
+</head>
+<body class="chat-page">
+
+<header class="chat-header">
+    <div class="inner">
+        <a th:href="@{/}" class="brand">OneLine</a>
+        <span class="spacer"></span>
+        <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle theme">Theme</button>
+    </div>
+</header>
+
+<main class="chat-main">
+    <div class="inner">
+        <section class="session-chats">
+            <h2>Session chats</h2>
+            <p class="muted">Only this browser knows this list.</p>
+
+            <ul id="session-chats-list" class="session-chats-list"></ul>
+            <p id="session-chats-empty" class="muted" hidden>You have not joined any chats from this browser yet.</p>
+        </section>
+    </div>
+</main>
+
+<script th:src="@{/js/me.js}" defer></script>
+
+</body>
+</html>

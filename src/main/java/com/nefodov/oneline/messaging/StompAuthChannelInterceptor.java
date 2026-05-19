@@ -4,7 +4,6 @@ import com.nefodov.oneline.chat.ChatParticipant;
 import com.nefodov.oneline.chat.ChatParticipantService;
 import com.nefodov.oneline.chat.ChatSession;
 import com.nefodov.oneline.security.MagicLinkAuthentication;
-import com.nefodov.oneline.support.HkdfKeyDerivation;
 import com.nefodov.oneline.support.TokenHasher;
 import lombok.AllArgsConstructor;
 import org.springframework.messaging.Message;
@@ -27,7 +26,6 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private final ChatParticipantService participantService;
     private final TokenHasher tokenHasher;
-    private final HkdfKeyDerivation keyDerivation;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -55,8 +53,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         ChatParticipant participant = participantService.resolveBySession(sessionToken)
                 .filter(p -> MessageDigest.isEqual(p.getChat().getChatTokenHash(), chatHash))
                 .orElseThrow(() -> new MessagingException("Unauthorized"));
-        byte[] messageKey = keyDerivation.deriveChatMessageKey(chatToken, participant.getChat().getId());
-        accessor.setUser(new MagicLinkAuthentication(new ChatSession(participant.getChat(), participant, messageKey)));
+        accessor.setUser(new MagicLinkAuthentication(new ChatSession(participant.getChat(), participant)));
     }
 
     private void authorizeSubscribe(StompHeaderAccessor accessor) {
@@ -65,7 +62,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             throw new MessagingException("Unauthorized");
         }
         String destination = accessor.getDestination();
-        String expected = SimpChatBroadcaster.TOPIC_PREFIX + auth.session().chat().getId();
+        String expected = ChatBroadcaster.TOPIC_PREFIX + auth.session().chat().getId();
         if (!expected.equals(destination)) {
             throw new MessagingException("Forbidden subscription");
         }
