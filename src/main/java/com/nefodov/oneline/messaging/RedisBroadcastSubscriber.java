@@ -17,17 +17,25 @@ import tools.jackson.databind.json.JsonMapper;
 public class RedisBroadcastSubscriber {
 
     @Bean
-    public RedisMessageListenerContainer redisBroadcastListenerContainer(RedisConnectionFactory connectionFactory,
-                                                                         MessageListenerAdapter redisBroadcastListenerAdapter) {
+    public RedisMessageListenerContainer redisBroadcastListenerContainer(
+            RedisConnectionFactory connectionFactory,
+            MessageListenerAdapter redisMessageListenerAdapter,
+            MessageListenerAdapter redisEventListenerAdapter) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(redisBroadcastListenerAdapter, new ChannelTopic(RedisChatBroadcaster.CHANNEL));
+        container.addMessageListener(redisMessageListenerAdapter, new ChannelTopic(RedisChatBroadcaster.CHANNEL));
+        container.addMessageListener(redisEventListenerAdapter, new ChannelTopic(RedisChatBroadcaster.EVENTS_CHANNEL));
         return container;
     }
 
     @Bean
-    public MessageListenerAdapter redisBroadcastListenerAdapter(Receiver receiver) {
+    public MessageListenerAdapter redisMessageListenerAdapter(Receiver receiver) {
         return new MessageListenerAdapter(receiver, "onMessage");
+    }
+
+    @Bean
+    public MessageListenerAdapter redisEventListenerAdapter(Receiver receiver) {
+        return new MessageListenerAdapter(receiver, "onEvent");
     }
 
     @Component
@@ -43,10 +51,23 @@ public class RedisBroadcastSubscriber {
 
         public void onMessage(String payload) {
             try {
-                RedisChatBroadcaster.BroadcastEnvelope envelope = jsonMapper.readValue(payload, RedisChatBroadcaster.BroadcastEnvelope.class);
+                RedisChatBroadcaster.MessageEnvelope envelope =
+                        jsonMapper.readValue(payload, RedisChatBroadcaster.MessageEnvelope.class);
                 simp.convertAndSend(ChatBroadcaster.TOPIC_PREFIX + envelope.chatId(), envelope.message());
             } catch (JacksonException e) {
-                log.warn("Could not decode broadcast envelope: {}", e.getMessage());
+                log.warn("Could not decode message envelope: {}", e.getMessage());
+            }
+        }
+
+        public void onEvent(String payload) {
+            try {
+                RedisChatBroadcaster.EventEnvelope envelope =
+                        jsonMapper.readValue(payload, RedisChatBroadcaster.EventEnvelope.class);
+                simp.convertAndSend(
+                        ChatBroadcaster.TOPIC_PREFIX + envelope.chatId() + ChatBroadcaster.EVENTS_SUFFIX,
+                        envelope.event());
+            } catch (JacksonException e) {
+                log.warn("Could not decode event envelope: {}", e.getMessage());
             }
         }
     }

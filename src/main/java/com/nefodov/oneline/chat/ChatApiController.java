@@ -4,7 +4,11 @@ import com.nefodov.oneline.chat.dto.*;
 import com.nefodov.oneline.message.Message;
 import com.nefodov.oneline.message.MessageService;
 import com.nefodov.oneline.message.dto.MessageResponse;
-import com.nefodov.oneline.support.*;
+import com.nefodov.oneline.messaging.PresenceService;
+import com.nefodov.oneline.support.NotFoundException;
+import com.nefodov.oneline.support.RateLimiter;
+import com.nefodov.oneline.support.SessionCookieFactory;
+import com.nefodov.oneline.support.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -31,6 +35,7 @@ public class ChatApiController {
     private final MessageService messageService;
     private final SessionCookieFactory sessionCookieFactory;
     private final RateLimiter rateLimiter;
+    private final PresenceService presenceService;
 
     @GetMapping("/{publicId}")
     public ChatMetaResponse meta(@PathVariable UUID publicId,
@@ -60,6 +65,11 @@ public class ChatApiController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(new JoinChatResponse(chat.getId(), new ParticipantView(joined.participant().getId(), joined.participant().getDisplayName())));
+    }
+
+    @GetMapping("/{publicId}/presence")
+    public List<ParticipantView> presence(@AuthenticationPrincipal ChatSession session) {
+        return presenceService.online(session.chat().getId());
     }
 
     @GetMapping("/{publicId}/messages")

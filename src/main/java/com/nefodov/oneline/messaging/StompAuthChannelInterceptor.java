@@ -62,8 +62,8 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             throw new MessagingException("Unauthorized");
         }
         String destination = accessor.getDestination();
-        String expected = ChatBroadcaster.TOPIC_PREFIX + auth.session().chat().getId();
-        if (!expected.equals(destination)) {
+        String base = ChatBroadcaster.TOPIC_PREFIX + auth.session().chat().getId();
+        if (!base.equals(destination) && !(base + ChatBroadcaster.EVENTS_SUFFIX).equals(destination)) {
             throw new MessagingException("Forbidden subscription");
         }
     }

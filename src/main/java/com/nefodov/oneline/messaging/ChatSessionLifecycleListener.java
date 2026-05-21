@@ -11,30 +11,45 @@ import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.security.Principal;
+import java.util.Optional;
 
 @Component
 @AllArgsConstructor
 public class ChatSessionLifecycleListener {
 
     private final ChatParticipantService participantService;
+    private final PresenceService presenceService;
+    private final ChatBroadcaster broadcaster;
 
     @EventListener
     public void onConnected(SessionConnectedEvent event) {
-        touchPrincipal(event);
+        session(event).ifPresent(s -> {
+            participantService.touch(s.participant());
+            presenceService.markOnline(s.chat().getId(), s.participant().getId(), s.participant().getDisplayName());
+            broadcastPresence(s.chat().getId());
+        });
     }
 
     @EventListener
     public void onDisconnect(SessionDisconnectEvent event) {
-        touchPrincipal(event);
+        session(event).ifPresent(s -> {
+            presenceService.markOffline(s.chat().getId(), s.participant().getId());
+            broadcastPresence(s.chat().getId());
+        });
     }
 
-    private void touchPrincipal(AbstractSubProtocolEvent event) {
+    private void broadcastPresence(Long chatId) {
+        broadcaster.broadcastEvent(chatId, ChatEvent.presence(presenceService.online(chatId)));
+    }
+
+    private Optional<ChatSession> session(AbstractSubProtocolEvent event) {
         Principal user = event.getUser();
         if (user instanceof MagicLinkAuthentication auth) {
             ChatSession session = auth.session();
             if (session != null && session.participant() != null) {
-                participantService.touch(session.participant());
+                return Optional.of(session);
             }
         }
+        return Optional.empty();
     }
 }

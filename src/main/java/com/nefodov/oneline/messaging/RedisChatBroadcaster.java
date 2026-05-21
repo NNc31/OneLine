@@ -10,6 +10,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class RedisChatBroadcaster implements ChatBroadcaster {
 
     static final String CHANNEL = "oneline.chat.broadcast";
+    static final String EVENTS_CHANNEL = "oneline.chat.events";
 
     private final StringRedisTemplate redis;
     private final JsonMapper jsonMapper;
@@ -21,14 +22,25 @@ public class RedisChatBroadcaster implements ChatBroadcaster {
 
     @Override
     public void broadcast(Long chatId, MessageResponse message) {
+        publish(CHANNEL, new MessageEnvelope(chatId, message));
+    }
+
+    @Override
+    public void broadcastEvent(Long chatId, ChatEvent event) {
+        publish(EVENTS_CHANNEL, new EventEnvelope(chatId, event));
+    }
+
+    private void publish(String channel, Object envelope) {
         try {
-            BroadcastEnvelope envelope = new BroadcastEnvelope(chatId, message);
-            redis.convertAndSend(CHANNEL, jsonMapper.writeValueAsString(envelope));
+            redis.convertAndSend(channel, jsonMapper.writeValueAsString(envelope));
         } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize broadcast envelope", e);
         }
     }
 
-    public record BroadcastEnvelope(Long chatId, MessageResponse message) {
+    public record MessageEnvelope(Long chatId, MessageResponse message) {
+    }
+
+    public record EventEnvelope(Long chatId, ChatEvent event) {
     }
 }

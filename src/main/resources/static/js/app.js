@@ -19,6 +19,8 @@
     const sendInputEl = document.getElementById('send-input');
     const statusEl = document.getElementById('conn-status');
     const meBadgeEl = document.getElementById('me-badge');
+    const onlineCountEl = document.getElementById('online-count');
+    const typingEl = document.getElementById('typing-indicator');
 
     const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
         hour: '2-digit',
@@ -191,7 +193,7 @@
                 lastUsed: new Date().toISOString(),
             });
             localStorage.setItem(KEY, JSON.stringify(filtered.slice(0, 50)));
-        } catch (_) { /* localStorage unavailable, ignore */ }
+        } catch (_) { /* ignore */ }
     };
 
     const loadHistoryAndConnect = async (me) => {
@@ -239,6 +241,86 @@
         connectWebSocket();
     };
 
+    const updatePresence = (online) => {
+        if (!onlineCountEl) {
+            return;
+        }
+        const count = Array.isArray(online) ? online.length : 0;
+        onlineCountEl.textContent = count + ' online';
+        onlineCountEl.hidden = count === 0;
+    };
+
+    const typingNames = new Map();
+    const typingTimers = new Map();
+
+    const renderTyping = () => {
+        if (!typingEl) {
+            return;
+        }
+        const names = [...typingNames.values()];
+        if (names.length === 0) {
+            typingEl.hidden = true;
+            typingEl.textContent = '';
+            return;
+        }
+        if (names.length === 1) {
+            typingEl.textContent = `${names[0]} is typing…`;
+        } else if (names.length === 2) {
+            typingEl.textContent = `${names[0]} and ${names[1]} are typing…`;
+        } else {
+            typingEl.textContent = 'Several people are typing…';
+        }
+        typingEl.hidden = false;
+    };
+
+    const handleTyping = (participant, typing) => {
+        if (!participant || participant.id === meId) {
+            return;
+        }
+        const id = participant.id;
+        if (typingTimers.has(id)) {
+            clearTimeout(typingTimers.get(id));
+            typingTimers.delete(id);
+        }
+        if (typing) {
+            typingNames.set(id, participant.displayName);
+            typingTimers.set(id, setTimeout(() => {
+                typingNames.delete(id);
+                typingTimers.delete(id);
+                renderTyping();
+            }, 6000));
+        } else {
+            typingNames.delete(id);
+        }
+        renderTyping();
+    };
+
+    const handleEvent = (ev) => {
+        if (!ev || !ev.type) {
+            return;
+        }
+        if (ev.type === 'presence') {
+            updatePresence(ev.online || []);
+        } else if (ev.type === 'typing') {
+            handleTyping(ev.participant, ev.typing);
+        }
+    };
+
+    const fetchPresence = async () => {
+        try {
+            const resp = await fetch(`/api/chats/${publicId}/presence`, {
+                method: 'GET',
+                headers: apiHeaders(),
+                credentials: 'same-origin',
+            });
+            if (resp.ok) {
+                updatePresence(await resp.json());
+            }
+        } catch (e) {
+            console.error('Presence fetch failed', e);
+        }
+    };
+
     const connectWebSocket = () => {
         const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
         const client = new StompJs.Client({
@@ -259,6 +341,14 @@
                     console.error('Bad message frame', e);
                 }
             });
+            client.subscribe(`/topic/chat.${chatId}.events`, (frame) => {
+                try {
+                    handleEvent(JSON.parse(frame.body));
+                } catch (e) {
+                    console.error('Bad event frame', e);
+                }
+            });
+            fetchPresence();
         };
         client.onWebSocketClose = () => setStatus('offline', 'Offline. Reconnecting...');
         client.onStompError = (frame) => {
@@ -273,6 +363,47 @@
         };
 
         client.activate();
+
+        const TYPING_RESEND_MS = 3000; // re-announce while still typing so receivers don't time out
+        const TYPING_IDLE_MS = 5000;   // announce "stopped" after this much idle
+        let amTyping = false;
+        let typingIdleTimer = null;
+        let lastTypingSentAt = 0;
+        const sendTyping = (state) => {
+            if (client.connected) {
+                client.publish({
+                    destination: `/app/chat.${chatId}.typing`,
+                    body: JSON.stringify({ typing: state }),
+                });
+            }
+        };
+        const stopTyping = () => {
+            if (typingIdleTimer) {
+                clearTimeout(typingIdleTimer);
+                typingIdleTimer = null;
+            }
+            if (amTyping) {
+                amTyping = false;
+                sendTyping(false);
+            }
+        };
+
+        sendInputEl.addEventListener('input', () => {
+            if (!client.connected) {
+                return;
+            }
+            const now = Date.now();
+            // Leading edge, then throttled re-announce so a long uninterrupted type stays "typing".
+            if (!amTyping || now - lastTypingSentAt >= TYPING_RESEND_MS) {
+                amTyping = true;
+                lastTypingSentAt = now;
+                sendTyping(true);
+            }
+            if (typingIdleTimer) {
+                clearTimeout(typingIdleTimer);
+            }
+            typingIdleTimer = setTimeout(stopTyping, TYPING_IDLE_MS);
+        });
 
         sendFormEl.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -292,6 +423,7 @@
                 destination: `/app/chat.${chatId}.send`,
                 body: JSON.stringify({ clientMessageId: id, content: ciphertextBase64 }),
             });
+            stopTyping();
             sendInputEl.value = '';
             sendInputEl.focus();
         });

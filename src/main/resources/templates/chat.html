@@ -18,6 +18,8 @@
         <span class="spacer"></span>
         <button type="button" class="theme-toggle" data-sound-toggle aria-label="Toggle sound">Sound</button>
         <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle theme">Theme</button>
+        <span id="online-count" class="online" hidden></span>
+        <span class="header-break" aria-hidden="true"></span>
         <span id="me-badge" class="me" hidden></span>
     </div>
 </header>
@@ -48,6 +50,7 @@
     </div>
 </main>
 
+<div id="typing-indicator" class="typing" hidden></div>
 <form id="send-form" class="send" autocomplete="off" hidden>
     <input id="send-input" type="text" name="content" maxlength="4000" required placeholder="Type something" autocomplete="off">
     <button type="submit" class="primary">Send</button>

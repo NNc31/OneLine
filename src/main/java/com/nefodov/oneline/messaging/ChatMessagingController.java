@@ -2,6 +2,7 @@ package com.nefodov.oneline.messaging;
 
 import com.nefodov.oneline.chat.ChatParticipantService;
 import com.nefodov.oneline.chat.ChatSession;
+import com.nefodov.oneline.chat.dto.ParticipantView;
 import com.nefodov.oneline.message.Message;
 import com.nefodov.oneline.message.MessageService;
 import com.nefodov.oneline.message.dto.MessageResponse;
@@ -45,5 +46,15 @@ public class ChatMessagingController {
                 stored.getContent(),
                 stored.getCreatedAt()
         ));
+    }
+
+    @MessageMapping("/chat.{chatId}.typing")
+    public void typing(@DestinationVariable Long chatId, @Payload TypingRequest request, MagicLinkAuthentication auth) {
+        ChatSession session = auth.session();
+        if (!session.chat().getId().equals(chatId)) {
+            throw new MessagingException("Chat mismatch");
+        }
+        ParticipantView me = new ParticipantView(session.participant().getId(), session.participant().getDisplayName());
+        broadcaster.broadcastEvent(chatId, ChatEvent.typing(me, request.typing()));
     }
 }
