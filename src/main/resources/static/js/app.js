@@ -1,11 +1,12 @@
-(() => {
+(async () => {
     const root = document.querySelector('.chat-main .inner[data-public-id]');
     if (!root) {
         return;
     }
 
     const publicId = root.dataset.publicId;
-    const chatToken = (window.location.hash || '').replace(/^#/, '');
+    const secret = (window.location.hash || '').replace(/^#/, '');
+    let authToken = null;
 
     const missingSecretEl = document.getElementById('missing-secret');
     const joinCardEl = document.getElementById('join-card');
@@ -25,13 +26,21 @@
         hour12: false,
     });
 
-    if (!chatToken) {
+    if (!secret) {
+        missingSecretEl.hidden = false;
+        return;
+    }
+
+    try {
+        authToken = await OneLineCrypto.deriveAuthToken(secret);
+    } catch (e) {
+        console.error('Auth token derivation failed', e);
         missingSecretEl.hidden = false;
         return;
     }
 
     const apiHeaders = (extra) => ({
-        'X-Chat-Token': chatToken,
+        'X-Chat-Token': authToken,
         'Accept': 'application/json',
         ...(extra || {}),
     });
@@ -177,7 +186,7 @@
             const filtered = list.filter(c => c.publicId !== publicId);
             filtered.unshift({
                 publicId,
-                secret: chatToken,
+                secret: secret,
                 displayName: displayName || null,
                 lastUsed: new Date().toISOString(),
             });
@@ -191,7 +200,7 @@
         rememberChat(me.displayName);
 
         try {
-            cryptoKey = await OneLineCrypto.deriveKey(chatToken, chatId);
+            cryptoKey = await OneLineCrypto.deriveKey(secret, chatId);
         } catch (e) {
             console.error('Key derivation failed', e);
             setStatus('error', 'Cannot derive encryption key');
@@ -234,7 +243,7 @@
         const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
         const client = new StompJs.Client({
             brokerURL: wsUrl,
-            connectHeaders: { 'X-Chat-Token': chatToken },
+            connectHeaders: { 'X-Chat-Token': authToken },
             reconnectDelay: 2000,
             heartbeatIncoming: 10000,
             heartbeatOutgoing: 10000,

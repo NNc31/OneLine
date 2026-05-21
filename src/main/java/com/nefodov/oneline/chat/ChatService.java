@@ -1,7 +1,6 @@
 package com.nefodov.oneline.chat;
 
 import com.nefodov.oneline.support.NotFoundException;
-import com.nefodov.oneline.support.TokenGenerator;
 import com.nefodov.oneline.support.TokenHasher;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,17 +15,17 @@ import java.util.UUID;
 public class ChatService {
 
     private final ChatRepository chatRepository;
-    private final TokenGenerator tokenGenerator;
     private final TokenHasher tokenHasher;
 
     @Transactional
-    public CreatedChat create() {
-        String chatToken = tokenGenerator.newToken();
+    public Chat create(String authToken) {
+        if (authToken == null || authToken.isBlank()) {
+            throw new IllegalArgumentException("Auth token is required");
+        }
         Chat chat = new Chat();
         chat.setPublicId(UUID.randomUUID());
-        chat.setChatTokenHash(tokenHasher.hash(chatToken));
-        Chat saved = chatRepository.save(chat);
-        return new CreatedChat(saved, chatToken);
+        chat.setChatTokenHash(tokenHasher.hash(authToken));
+        return chatRepository.save(chat);
     }
 
     @Transactional(readOnly = true)
@@ -53,8 +52,5 @@ public class ChatService {
     @Transactional
     public int deleteInactiveBefore(Instant cutoff) {
         return chatRepository.deleteInactiveBefore(cutoff);
-    }
-
-    public record CreatedChat(Chat chat, String chatToken) {
     }
 }

@@ -4,10 +4,10 @@ Anonymous magic-link chat. Create a room, share the link, and anyone with it can
 
 ## Highlights
 
-- **End-to-end encryption.** Messages are encrypted in the browser with WebCrypto.
-  The server stores and routes opaque ciphertext bytes and never sees plaintext.
-  The chat token lives in the URL fragment only (`/c/{publicId}#{chatToken}`) – browser never sends the `chatToken` to the server.
-  The database stores only an SHA-256 hash of the token for routing authorization.
+- **End-to-end encryption.** Messages are encrypted and decrypted client-side.
+  A 256-bit secret is generated in the browser and lives only in the URL fragment (`/c/{publicId}#{secret}`).
+  Client derives via HKDF-SHA256 two independent values: an **auth token** and an **AES-256-GCM message key**. 
+  Auth token is sent to the server for authentication and routing, message key stays in the browser for encryption and decryption.
 - **"Session chats" live in the browser.** JS layer saves `{publicId, secret, displayName}` to `localStorage`.
   `/me` page renders list of stored chats.
 - **Sliding, idempotent session.** Random session token generated during joining, 
@@ -55,6 +55,8 @@ Configuration properties can be found in [`src/main/resources/application.yaml`]
 ## What this is not
 
 - The server still serves the JavaScript that performs the encryption. A compromised origin could leak plaintext or keys.
+- E2E protects data in transit and on the server, not a compromised endpoint.
+  Malware or a malicious browser extension on a participant's device can read the decrypted messages, the secret in the URL, or the secrets cached in `localStorage`.
 - Not built for many users in one chat. The Redis pub/sub channel is enough for the current scale target, 
   but the in-process broker still holds active subscribers per instance.
 - Redis is required. Both the cross-instance broadcast and the rate limiter run through it.

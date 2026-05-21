@@ -3,6 +3,8 @@ window.OneLineCrypto = (() => {
     const NONCE_BYTES = 12;
     const KEY_BITS = 256;
     const INFO = new TextEncoder().encode('oneline.message.v1');
+    const AUTH_INFO = new TextEncoder().encode('oneline.auth.v1');
+    const SECRET_BYTES = 32;
 
     const chatIdSalt = (chatId) => {
         const view = new DataView(new ArrayBuffer(8));
@@ -26,6 +28,21 @@ window.OneLineCrypto = (() => {
             out[i] = binary.charCodeAt(i);
         }
         return out;
+    };
+
+    const base64UrlEncode = (bytes) => base64Encode(bytes)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+    const randomSecret = () => base64UrlEncode(crypto.getRandomValues(new Uint8Array(SECRET_BYTES)));
+    const deriveAuthToken = async (secret) => {
+        const ikm = new TextEncoder().encode(secret);
+        const baseKey = await crypto.subtle.importKey('raw', ikm, { name: 'HKDF' }, false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits(
+            { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: AUTH_INFO },
+            baseKey,
+            256);
+        return base64UrlEncode(new Uint8Array(bits));
     };
 
     const concat = (...arrays) => {
@@ -89,5 +106,5 @@ window.OneLineCrypto = (() => {
         return new TextDecoder().decode(plain);
     };
 
-    return { deriveKey, encrypt, decrypt, base64Encode, base64Decode };
+    return { randomSecret, deriveAuthToken, deriveKey, encrypt, decrypt, base64Encode, base64Decode };
 })();

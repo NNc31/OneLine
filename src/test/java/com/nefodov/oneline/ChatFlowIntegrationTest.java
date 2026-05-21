@@ -1,5 +1,6 @@
 package com.nefodov.oneline;
 
+import com.nefodov.oneline.support.RateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,7 +9,6 @@ import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRe
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import com.nefodov.oneline.support.RateLimiter;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.messaging.converter.SimpleMessageConverter;
@@ -24,10 +24,6 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
@@ -35,9 +31,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
@@ -101,7 +95,7 @@ class ChatFlowIntegrationTest {
 
     @Test
     @DisplayName("Joining with an already taken name returns 409")
-    void joinWithTakenNameReturns409() throws Exception {
+    void joinWithTakenNameReturns409() {
         CreatedChat chat = createChat();
 
         ResponseEntity<String> first = restTemplate.exchange(
@@ -121,7 +115,7 @@ class ChatFlowIntegrationTest {
 
     @Test
     @DisplayName("History without a valid session returns 401")
-    void historyWithoutSessionIsUnauthorized() throws Exception {
+    void historyWithoutSessionIsUnauthorized() {
         CreatedChat chat = createChat();
 
         ResponseEntity<String> resp = restTemplate.exchange(
@@ -134,7 +128,7 @@ class ChatFlowIntegrationTest {
 
     @Test
     @DisplayName("Join with a wrong chat token returns 404")
-    void joinWithWrongTokenReturns404() throws Exception {
+    void joinWithWrongTokenReturns404() {
         CreatedChat chat = createChat();
 
         ResponseEntity<String> resp = restTemplate.exchange(
@@ -159,21 +153,17 @@ class ChatFlowIntegrationTest {
         assertTrue(allowed < 40);
     }
 
-    private CreatedChat createChat() throws Exception {
-        HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:" + port + "/new"))
-                .POST(HttpRequest.BodyPublishers.noBody())
-                .build();
-        HttpResponse<Void> resp = client.send(request, HttpResponse.BodyHandlers.discarding());
-        assertEquals(302, resp.statusCode());
-        String location = resp.headers().firstValue("Location").orElseThrow();
-        URI uri = URI.create(location);
-        String path = uri.getPath();
-        String publicId = path.substring(path.lastIndexOf('/') + 1);
-        String token = uri.getFragment();
-        assertNotNull(token);
-        return new CreatedChat(publicId, token);
+    private CreatedChat createChat() {
+        String authToken = "tok-" + UUID.randomUUID();
+        ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+                "/api/chats",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"authToken\":\"" + authToken + "\"}", jsonHeaders()),
+                JSON_OBJECT);
+        assertEquals(HttpStatus.OK, resp.getStatusCode());
+        String publicId = (String) resp.getBody().get("publicId");
+        assertNotNull(publicId);
+        return new CreatedChat(publicId, authToken);
     }
 
     private StompSession connectStomp(String chatToken, String sessionCookie) throws Exception {

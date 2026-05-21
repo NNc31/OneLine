@@ -1,9 +1,6 @@
 package com.nefodov.oneline.chat;
 
-import com.nefodov.oneline.chat.dto.ChatMetaResponse;
-import com.nefodov.oneline.chat.dto.JoinChatRequest;
-import com.nefodov.oneline.chat.dto.JoinChatResponse;
-import com.nefodov.oneline.chat.dto.ParticipantView;
+import com.nefodov.oneline.chat.dto.*;
 import com.nefodov.oneline.message.Message;
 import com.nefodov.oneline.message.MessageService;
 import com.nefodov.oneline.message.dto.MessageResponse;
@@ -25,6 +22,7 @@ import java.util.UUID;
 public class ChatApiController {
 
     private static final String CHAT_TOKEN_HEADER = "X-Chat-Token";
+    private static final String BUCKET_CREATE_CHAT = "create-chat";
     private static final String BUCKET_JOIN = "join";
 
     private final ChatService chatService;
@@ -69,6 +67,13 @@ public class ChatApiController {
                                          @RequestParam(required = false) Integer limit,
                                          @AuthenticationPrincipal ChatSession session) {
         return messageService.history(session, before, limit).stream().map(this::toResponse).toList();
+    }
+
+    @PostMapping
+    public CreateChatResponse create(@RequestBody CreateChatRequest request, HttpServletRequest httpRequest) {
+        enforceRateLimit(BUCKET_CREATE_CHAT, httpRequest);
+        Chat chat = chatService.create(request.authToken());
+        return new CreateChatResponse(chat.getPublicId());
     }
 
     private Chat resolveChat(UUID publicId, String chatToken) {
