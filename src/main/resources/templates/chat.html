@@ -29,15 +29,13 @@
 
         <section id="missing-secret" class="join-card" hidden>
             <h2>Missing access</h2>
-            <p>The link you opened doesn't contain a secret. Ask whoever shared it to send the
-                full URL — the part after <code>#</code> is the access token.</p>
+            <p>The link you opened doesn't contain a secret. Ask whoever shared it to send the full URL — the part after <code>#</code> is the access token.</p>
         </section>
 
         <section id="join-card" class="join-card" hidden>
             <h2>Pick a name</h2>
             <form id="join-form">
-                <input type="text" id="join-display-name" maxlength="40" required autofocus
-                       placeholder="e.g. Ethan, Agent A, etc.">
+                <input type="text" id="join-display-name" maxlength="40" required autofocus aria-label="Display name" placeholder="e.g. Ethan, Ivette, etc.">
                 <button type="submit" class="primary">Join chat</button>
             </form>
             <p id="join-error" class="error-message" hidden></p>
@@ -52,7 +50,7 @@
 
 <div id="typing-indicator" class="typing" hidden></div>
 <form id="send-form" class="send" autocomplete="off" hidden>
-    <input id="send-input" type="text" name="content" maxlength="4000" required placeholder="Type something" autocomplete="off">
+    <input id="send-input" type="text" name="content" maxlength="4000" required aria-label="Message" placeholder="Type something" autocomplete="off">
     <button type="submit" class="primary">Send</button>
 </form>
 <div id="conn-status" class="conn-status" data-state="connecting" hidden>Connecting...</div>
