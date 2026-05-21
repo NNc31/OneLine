@@ -19,9 +19,6 @@ public class ChatService {
 
     @Transactional
     public Chat create(String authToken) {
-        if (authToken == null || authToken.isBlank()) {
-            throw new IllegalArgumentException("Auth token is required");
-        }
         Chat chat = new Chat();
         chat.setPublicId(UUID.randomUUID());
         chat.setChatTokenHash(tokenHasher.hash(authToken));

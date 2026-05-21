@@ -1,4 +1,6 @@
 package com.nefodov.oneline.chat.dto;
 
-public record CreateChatRequest(String authToken) {
+import jakarta.validation.constraints.NotBlank;
+
+public record CreateChatRequest(@NotBlank String authToken) {
 }

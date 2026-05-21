@@ -8,6 +8,7 @@ import com.nefodov.oneline.message.dto.MessageResponse;
 import com.nefodov.oneline.message.dto.SendMessageRequest;
 import com.nefodov.oneline.security.MagicLinkAuthentication;
 import com.nefodov.oneline.support.RateLimiter;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -27,7 +28,7 @@ public class ChatMessagingController {
     private final RateLimiter rateLimiter;
 
     @MessageMapping("/chat.{chatId}.send")
-    public void send(@DestinationVariable Long chatId, @Payload SendMessageRequest request, MagicLinkAuthentication auth) {
+    public void send(@DestinationVariable Long chatId, @Valid @Payload SendMessageRequest request, MagicLinkAuthentication auth) {
         ChatSession session = auth.session();
         if (!session.chat().getId().equals(chatId)) {
             throw new MessagingException("Chat mismatch");

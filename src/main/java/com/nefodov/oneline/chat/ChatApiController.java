@@ -6,6 +6,7 @@ import com.nefodov.oneline.message.MessageService;
 import com.nefodov.oneline.message.dto.MessageResponse;
 import com.nefodov.oneline.support.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -30,7 +31,6 @@ public class ChatApiController {
     private final MessageService messageService;
     private final SessionCookieFactory sessionCookieFactory;
     private final RateLimiter rateLimiter;
-    private final ClientIpResolver clientIpResolver;
 
     @GetMapping("/{publicId}")
     public ChatMetaResponse meta(@PathVariable UUID publicId,
@@ -45,7 +45,7 @@ public class ChatApiController {
     public ResponseEntity<JoinChatResponse> join(@PathVariable UUID publicId,
                                                  @RequestHeader(CHAT_TOKEN_HEADER) String chatToken,
                                                  @AuthenticationPrincipal ChatSession session,
-                                                 @RequestBody JoinChatRequest request,
+                                                 @Valid @RequestBody JoinChatRequest request,
                                                  HttpServletRequest httpRequest) {
         Chat chat = chatService.findActive(publicId, chatToken);
         if (session != null && session.chat().getId().equals(chat.getId())) {
@@ -70,7 +70,7 @@ public class ChatApiController {
     }
 
     @PostMapping
-    public CreateChatResponse create(@RequestBody CreateChatRequest request, HttpServletRequest httpRequest) {
+    public CreateChatResponse create(@Valid @RequestBody CreateChatRequest request, HttpServletRequest httpRequest) {
         enforceRateLimit(BUCKET_CREATE_CHAT, httpRequest);
         Chat chat = chatService.create(request.authToken());
         return new CreateChatResponse(chat.getPublicId());
@@ -98,8 +98,7 @@ public class ChatApiController {
     }
 
     private void enforceRateLimit(String bucket, HttpServletRequest request) {
-        String clientIp = clientIpResolver.resolve(request);
-        if (!rateLimiter.tryAcquire(bucket, clientIp)) {
+        if (!rateLimiter.tryAcquire(bucket, request.getRemoteAddr())) {
             throw new TooManyRequestsException("Too many requests for " + bucket);
         }
     }

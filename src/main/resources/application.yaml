@@ -16,6 +16,18 @@ spring:
   flyway:
     enabled: true
 
+server:
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 oneline:
   participant:
     activity-window: PT10M
