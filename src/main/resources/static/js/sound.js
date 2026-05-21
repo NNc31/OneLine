@@ -2,9 +2,34 @@
     const STORAGE_KEY = 'oneline.muted';
     let muted = localStorage.getItem(STORAGE_KEY) === '1';
 
+    const audio = new Audio('/sfx/snap.mp3');
+    audio.preload = 'auto';
+    let unlocked = false;
+
+    const unlock = () => {
+        if (unlocked) {
+            return;
+        }
+        const volume = audio.volume;
+        audio.volume = 0;
+        audio.play().then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.volume = volume;
+            unlocked = true;
+            document.removeEventListener('pointerdown', unlock);
+            document.removeEventListener('keydown', unlock);
+        }).catch(() => {
+            audio.volume = volume;
+        });
+    };
+    document.addEventListener('pointerdown', unlock);
+    document.addEventListener('keydown', unlock);
+
     const play = () => {
         if (!muted) {
-            new Audio('/sfx/snap.mp3').play().catch(() => {});
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
         }
     };
 
@@ -30,6 +55,5 @@
 
     window.OneLineSound = {
         play: () => play(),
-        isMuted: () => muted,
     };
 })();
