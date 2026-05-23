@@ -1,11 +1,14 @@
 package com.nefodov.oneline.messaging;
 
 import com.nefodov.oneline.message.dto.MessageResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
+@Slf4j
 @Component
 public class RedisChatBroadcaster implements ChatBroadcaster {
 
@@ -33,8 +36,10 @@ public class RedisChatBroadcaster implements ChatBroadcaster {
     private void publish(String channel, Object envelope) {
         try {
             redis.convertAndSend(channel, jsonMapper.writeValueAsString(envelope));
+        } catch (DataAccessException e) {
+            log.warn("Redis unavailable, skipping broadcast to {}: {}", channel, e.getMessage());
         } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to serialize broadcast envelope", e);
+            log.warn("Failed to serialize broadcast envelope for {}: {}", channel, e.getMessage());
         }
     }
 

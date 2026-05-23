@@ -4,12 +4,14 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.function.Supplier;
 
+@Slf4j
 @Component
 public class Bucket4jRateLimiter implements RateLimiter {
 
@@ -25,8 +27,13 @@ public class Bucket4jRateLimiter implements RateLimiter {
     public boolean tryAcquire(String bucketName, String key) {
         OneLineProperties.RateLimit.Bucket config = configFor(bucketName);
         byte[] redisKey = ("oneline:rl:" + bucketName + ":" + key).getBytes(StandardCharsets.UTF_8);
-        BucketProxy bucket = proxyManager.builder().build(redisKey, configurationSupplier(config));
-        return bucket.tryConsume(1);
+        try {
+            BucketProxy bucket = proxyManager.builder().build(redisKey, configurationSupplier(config));
+            return bucket.tryConsume(1);
+        } catch (RuntimeException e) {
+            log.warn("Rate limiter unavailable for bucket '{}', allowing request: {}", bucketName, e.getMessage());
+            return true;
+        }
     }
 
     private Supplier<BucketConfiguration> configurationSupplier(OneLineProperties.RateLimit.Bucket config) {

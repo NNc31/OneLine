@@ -9,6 +9,7 @@ import com.nefodov.oneline.message.dto.MessageResponse;
 import com.nefodov.oneline.message.dto.SendMessageRequest;
 import com.nefodov.oneline.security.MagicLinkAuthentication;
 import com.nefodov.oneline.support.RateLimiter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.messaging.MessagingException;
@@ -27,6 +28,7 @@ public class ChatMessagingController {
     private final ChatParticipantService participantService;
     private final ChatBroadcaster broadcaster;
     private final RateLimiter rateLimiter;
+    private final MeterRegistry meterRegistry;
 
     @MessageMapping("/chat.{chatId}.send")
     public void send(@DestinationVariable Long chatId, @Valid @Payload SendMessageRequest request, MagicLinkAuthentication auth) {
@@ -35,6 +37,7 @@ public class ChatMessagingController {
             throw new MessagingException("Chat mismatch");
         }
         if (!rateLimiter.tryAcquire(BUCKET_MESSAGE, String.valueOf(session.participant().getId()))) {
+            meterRegistry.counter("oneline.ratelimit.rejected", "bucket", BUCKET_MESSAGE).increment();
             throw new MessagingException("You're sending messages too fast");
         }
         Message stored = messageService.send(session, request.clientMessageId(), request.content());
@@ -46,6 +49,7 @@ public class ChatMessagingController {
                 stored.getContent(),
                 stored.getCreatedAt()
         ));
+        meterRegistry.counter("oneline.messages.sent").increment();
     }
 
     @MessageMapping("/chat.{chatId}.typing")

@@ -9,6 +9,7 @@ import com.nefodov.oneline.support.NotFoundException;
 import com.nefodov.oneline.support.RateLimiter;
 import com.nefodov.oneline.support.SessionCookieFactory;
 import com.nefodov.oneline.support.TooManyRequestsException;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -36,6 +37,7 @@ public class ChatApiController {
     private final SessionCookieFactory sessionCookieFactory;
     private final RateLimiter rateLimiter;
     private final PresenceService presenceService;
+    private final MeterRegistry meterRegistry;
 
     @GetMapping("/{publicId}")
     public ChatMetaResponse meta(@PathVariable UUID publicId,
@@ -109,6 +111,7 @@ public class ChatApiController {
 
     private void enforceRateLimit(String bucket, HttpServletRequest request) {
         if (!rateLimiter.tryAcquire(bucket, request.getRemoteAddr())) {
+            meterRegistry.counter("oneline.ratelimit.rejected", "bucket", bucket).increment();
             throw new TooManyRequestsException("Too many requests for " + bucket);
         }
     }
