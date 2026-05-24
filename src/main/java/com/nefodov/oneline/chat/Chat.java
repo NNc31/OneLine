@@ -31,6 +31,9 @@ public class Chat {
     @Column(name = "closed_at")
     private Instant closedAt;
 
+    @Column(name = "message_ttl_seconds")
+    private Long messageTtlSeconds;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {

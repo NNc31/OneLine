@@ -27,6 +27,11 @@ public class MessageService {
         return messageRepository.findByChatAndClientMessageId(chat, clientMessageId).orElseGet(() -> persist(session, clientMessageId, content));
     }
 
+    @Transactional
+    public int deleteExpired() {
+        return messageRepository.deleteExpiredByChatTtl();
+    }
+
     @Transactional(readOnly = true)
     public List<Message> history(ChatSession session, Long beforeId, Integer limit) {
         Chat chat = session.chat();

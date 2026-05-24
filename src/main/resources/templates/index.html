@@ -13,6 +13,17 @@
     <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle theme">Theme</button>
     <h1>OneLine</h1>
     <p class="lede">Your chat is your link. Your link is your access.</p>
+    <div class="ttl-field">
+        <label for="ttl-value">Self-destruct messages</label>
+        <div class="ttl-inputs">
+            <input type="number" id="ttl-value" min="1" inputmode="numeric" placeholder="off" aria-label="Message lifetime">
+            <select id="ttl-unit" aria-label="Message lifetime unit">
+                <option value="60">minutes</option>
+                <option value="3600">hours</option>
+                <option value="86400">days</option>
+            </select>
+        </div>
+    </div>
     <button type="button" id="create-chat" class="primary">Create chat</button>
     <p id="create-error" class="error-message" hidden></p>
     <p class="muted-link"><a th:href="@{/me}">Session chats</a></p>

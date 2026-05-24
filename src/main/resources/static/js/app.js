@@ -21,6 +21,7 @@
     const meBadgeEl = document.getElementById('me-badge');
     const onlineCountEl = document.getElementById('online-count');
     const typingEl = document.getElementById('typing-indicator');
+    const ttlNoteEl = document.getElementById('ttl-note');
 
     const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
         hour: '2-digit',
@@ -80,13 +81,42 @@
     let oldestMessageId = null;
     let loadingOlder = false;
     let noMoreHistory = false;
+    let messageTtlMs = null;
     const HISTORY_PAGE = 50;
+    const MAX_TIMEOUT_MS = 2147483647;
+
+    const humanizeTtl = (sec) => {
+        if (sec % 86400 === 0) {
+            return (sec / 86400) + 'd';
+        }
+        if (sec % 3600 === 0) {
+            return (sec / 3600) + 'h';
+        }
+        return Math.round(sec / 60) + 'm';
+    };
+
+    const applyTtl = (seconds) => {
+        messageTtlMs = seconds ? seconds * 1000 : null;
+        if (ttlNoteEl) {
+            ttlNoteEl.hidden = !seconds;
+            if (seconds) {
+                ttlNoteEl.textContent = 'self-destruct: ' + humanizeTtl(seconds);
+            }
+        }
+    };
 
     const createMessageEl = (m, plaintext) => {
         if (seenMessageIds.has(m.id)) {
             return null;
         }
         seenMessageIds.add(m.id);
+        let remainingMs = null;
+        if (messageTtlMs != null) {
+            remainingMs = new Date(m.createdAt).getTime() + messageTtlMs - Date.now();
+            if (remainingMs <= 0) {
+                return null;
+            }
+        }
         const li = document.createElement('li');
         li.className = 'message' + (m.participantId === meId ? ' mine' : '');
         li.dataset.messageId = String(m.id);
@@ -104,6 +134,9 @@
         body.textContent = plaintext;
 
         li.append(author, time, body);
+        if (remainingMs != null && remainingMs <= MAX_TIMEOUT_MS) {
+            setTimeout(() => li.remove(), remainingMs);
+        }
         return li;
     };
 
@@ -364,8 +397,14 @@
 
         client.activate();
 
-        const TYPING_RESEND_MS = 3000; // re-announce while still typing so receivers don't time out
-        const TYPING_IDLE_MS = 5000;   // announce "stopped" after this much idle
+        setInterval(() => {
+            if (client.connected) {
+                client.publish({ destination: `/app/chat.${chatId}.heartbeat`, body: '' });
+            }
+        }, 15000);
+
+        const TYPING_RESEND_MS = 3000;
+        const TYPING_IDLE_MS = 5000;
         let amTyping = false;
         let typingIdleTimer = null;
         let lastTypingSentAt = 0;
@@ -393,7 +432,6 @@
                 return;
             }
             const now = Date.now();
-            // Leading edge, then throttled re-announce so a long uninterrupted type stays "typing".
             if (!amTyping || now - lastTypingSentAt >= TYPING_RESEND_MS) {
                 amTyping = true;
                 lastTypingSentAt = now;
@@ -437,6 +475,7 @@
         .then(r => r.ok ? r.json() : Promise.reject(new Error(`meta ${r.status}`)))
         .then(meta => {
             chatId = meta.chatId;
+            applyTtl(meta.messageTtlSeconds);
             if (meta.me) {
                 return loadHistoryAndConnect(meta.me);
             }

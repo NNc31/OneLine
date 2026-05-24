@@ -18,10 +18,11 @@ public class ChatService {
     private final TokenHasher tokenHasher;
 
     @Transactional
-    public Chat create(String authToken) {
+    public Chat create(String authToken, Long messageTtlSeconds) {
         Chat chat = new Chat();
         chat.setPublicId(UUID.randomUUID());
         chat.setChatTokenHash(tokenHasher.hash(authToken));
+        chat.setMessageTtlSeconds(messageTtlSeconds);
         return chatRepository.save(chat);
     }
 

@@ -181,6 +181,38 @@ body.landing .lede {
     text-decoration: underline;
 }
 
+.ttl-field {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.ttl-field label {
+    display: block;
+    margin-bottom: 6px;
+}
+
+.ttl-inputs {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.ttl-inputs input,
+.ttl-inputs select {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 14px;
+}
+
+.ttl-inputs input {
+    width: 88px;
+    text-align: center;
+}
+
 body.chat-page {
     display: flex;
     flex-direction: column;
@@ -261,6 +293,12 @@ body.chat-page {
     border-radius: 50%;
     background: var(--online);
     vertical-align: middle;
+}
+
+.chat-header .ttl-note {
+    color: var(--muted);
+    font-size: 13px;
+    white-space: nowrap;
 }
 
 .chat-main {

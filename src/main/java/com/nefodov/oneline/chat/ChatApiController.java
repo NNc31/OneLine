@@ -45,7 +45,7 @@ public class ChatApiController {
                                  @AuthenticationPrincipal ChatSession session) {
         Chat chat = resolveChat(publicId, chatToken);
         ParticipantView me = session == null ? null : new ParticipantView(session.participant().getId(), session.participant().getDisplayName());
-        return new ChatMetaResponse(chat.getId(), participantService.countParticipants(chat), me);
+        return new ChatMetaResponse(chat.getId(), participantService.countParticipants(chat), me, chat.getMessageTtlSeconds());
     }
 
     @PostMapping("/{publicId}/join")
@@ -84,7 +84,7 @@ public class ChatApiController {
     @PostMapping
     public CreateChatResponse create(@Valid @RequestBody CreateChatRequest request, HttpServletRequest httpRequest) {
         enforceRateLimit(BUCKET_CREATE_CHAT, httpRequest);
-        Chat chat = chatService.create(request.authToken());
+        Chat chat = chatService.create(request.authToken(), request.messageTtlSeconds());
         return new CreateChatResponse(chat.getPublicId());
     }
 

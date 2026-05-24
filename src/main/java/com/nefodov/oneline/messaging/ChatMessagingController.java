@@ -27,6 +27,7 @@ public class ChatMessagingController {
     private final MessageService messageService;
     private final ChatParticipantService participantService;
     private final ChatBroadcaster broadcaster;
+    private final PresenceService presenceService;
     private final RateLimiter rateLimiter;
     private final MeterRegistry meterRegistry;
 
@@ -60,5 +61,17 @@ public class ChatMessagingController {
         }
         ParticipantView me = new ParticipantView(session.participant().getId(), session.participant().getDisplayName());
         broadcaster.broadcastEvent(chatId, ChatEvent.typing(me, request.typing()));
+    }
+
+    @MessageMapping("/chat.{chatId}.heartbeat")
+    public void heartbeat(@DestinationVariable Long chatId, MagicLinkAuthentication auth) {
+        ChatSession session = auth.session();
+        if (!session.chat().getId().equals(chatId)) {
+            throw new MessagingException("Chat mismatch");
+        }
+        presenceService.markOnline(chatId, session.participant().getId(), session.participant().getDisplayName());
+        if (presenceService.evictStale(chatId) > 0) {
+            broadcaster.broadcastEvent(chatId, ChatEvent.presence(presenceService.online(chatId)));
+        }
     }
 }

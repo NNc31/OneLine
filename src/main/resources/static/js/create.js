@@ -1,9 +1,19 @@
 (() => {
     const btn = document.getElementById('create-chat');
     const errorEl = document.getElementById('create-error');
+    const ttlValueEl = document.getElementById('ttl-value');
+    const ttlUnitEl = document.getElementById('ttl-unit');
     if (!btn) {
         return;
     }
+
+    const readTtlSeconds = () => {
+        const n = parseInt(ttlValueEl && ttlValueEl.value, 10);
+        if (!Number.isFinite(n) || n <= 0) {
+            return null;
+        }
+        return n * parseInt(ttlUnitEl.value, 10);
+    };
 
     btn.addEventListener('click', async () => {
         btn.disabled = true;
@@ -13,11 +23,13 @@
         try {
             const secret = OneLineCrypto.randomSecret();
             const authToken = await OneLineCrypto.deriveAuthToken(secret);
+            const messageTtlSeconds = readTtlSeconds();
+            const payload = messageTtlSeconds ? { authToken, messageTtlSeconds } : { authToken };
             const resp = await fetch('/api/chats', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ authToken }),
+                body: JSON.stringify(payload),
             });
             if (!resp.ok) {
                 throw new Error('create failed (' + resp.status + ')');
