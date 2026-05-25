@@ -9,6 +9,7 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.ByteArrayCodec;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 
 import java.time.Duration;
@@ -18,11 +19,22 @@ public class RateLimitConfig {
 
     @Bean(destroyMethod = "shutdown")
     public RedisClient rateLimitRedisClient(LettuceConnectionFactory factory) {
-        RedisURI uri = RedisURI.builder()
+        RedisURI.Builder uri = RedisURI.builder()
                 .withHost(factory.getHostName())
                 .withPort(factory.getPort())
-                .build();
-        return RedisClient.create(uri);
+                .withSsl(factory.isUseSsl())
+                .withDatabase(factory.getDatabase());
+
+        RedisStandaloneConfiguration standalone = factory.getStandaloneConfiguration();
+        String username = standalone.getUsername();
+        standalone.getPassword().toOptional().ifPresent(password -> {
+            if (username != null && !username.isBlank()) {
+                uri.withAuthentication(username, password);
+            } else {
+                uri.withPassword(password);
+            }
+        });
+        return RedisClient.create(uri.build());
     }
 
     @Bean(destroyMethod = "close")
