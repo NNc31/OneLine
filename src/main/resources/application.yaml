@@ -54,6 +54,18 @@ oneline:
     message:
       capacity: 25
       refill-period: PT10S
+    attachment:
+      capacity: 10
+      refill-period: PT1M
+  storage:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:oneline}
+    secret-key: ${MINIO_SECRET_KEY:oneline_secret}
+    bucket: ${MINIO_BUCKET:oneline-attachments}
+    presign-ttl: PT5M
+    max-file-size: 104857600
+    unconfirmed-ttl: PT15M
   retention:
     inactivity-window: P365D
     cron: "0 0 3 * * *"

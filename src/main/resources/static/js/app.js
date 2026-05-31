@@ -22,6 +22,8 @@
     const onlineCountEl = document.getElementById('online-count');
     const typingEl = document.getElementById('typing-indicator');
     const ttlNoteEl = document.getElementById('ttl-note');
+    const attachBtnEl = document.getElementById('attach-btn');
+    const attachInputEl = document.getElementById('attach-input');
 
     const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
         hour: '2-digit',
@@ -84,6 +86,8 @@
     let messageTtlMs = null;
     const HISTORY_PAGE = 50;
     const MAX_TIMEOUT_MS = 2147483647;
+    const FILE_MARKER = 'file/v1';
+    const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
     const humanizeTtl = (sec) => {
         if (sec % 86400 === 0) {
@@ -103,6 +107,96 @@
                 ttlNoteEl.textContent = 'self-destruct: ' + humanizeTtl(seconds);
             }
         }
+    };
+
+    const parseFilePayload = (text) => {
+        try {
+            const obj = JSON.parse(text);
+            return obj && obj.k === FILE_MARKER ? obj : null;
+        } catch (_) {
+            return null;
+        }
+    };
+
+    const humanizeSize = (bytes) => {
+        if (bytes < 1024) {
+            return bytes + ' B';
+        }
+        if (bytes < 1024 * 1024) {
+            return (bytes / 1024).toFixed(1) + ' KB';
+        }
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    const trackUrl = (li, url) => {
+        (li._objectUrls || (li._objectUrls = [])).push(url);
+    };
+    const revokeUrls = (li) => {
+        (li._objectUrls || []).forEach(URL.revokeObjectURL);
+        li._objectUrls = [];
+    };
+
+    const downloadAndDecrypt = async (payload) => {
+        const resp = await fetch(`/api/chats/${publicId}/attachments/${payload.id}`, {
+            method: 'GET',
+            headers: apiHeaders(),
+            credentials: 'same-origin',
+        });
+        if (!resp.ok) {
+            throw new Error(`attachment url ${resp.status}`);
+        }
+        const { downloadUrl } = await resp.json();
+        const blobResp = await fetch(downloadUrl);
+        if (!blobResp.ok) {
+            throw new Error(`attachment fetch ${blobResp.status}`);
+        }
+        const ciphertext = new Uint8Array(await blobResp.arrayBuffer());
+        const fileKey = await OneLineCrypto.importRawKey(OneLineCrypto.base64Decode(payload.key));
+        return OneLineCrypto.decryptBytes(fileKey, ciphertext);
+    };
+
+    const renderFileBody = (li, body, payload) => {
+        body.classList.add('attachment');
+        const isImage = typeof payload.mime === 'string' && payload.mime.startsWith('image/');
+        if (isImage) {
+            const img = document.createElement('img');
+            img.className = 'attachment-image';
+            img.alt = payload.name || 'image';
+            body.appendChild(img);
+            downloadAndDecrypt(payload).then((plain) => {
+                const url = URL.createObjectURL(new Blob([plain], { type: payload.mime }));
+                trackUrl(li, url);
+                img.src = url;
+            }).catch((e) => {
+                console.error('Attachment load failed', e);
+                body.textContent = '⚠ attachment unavailable';
+            });
+            return;
+        }
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'attachment-file';
+        btn.textContent = `⬇ ${payload.name} (${humanizeSize(payload.size)})`;
+        btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            try {
+                const plain = await downloadAndDecrypt(payload);
+                const url = URL.createObjectURL(new Blob([plain], { type: payload.mime || 'application/octet-stream' }));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = payload.name || 'download';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+            } catch (e) {
+                console.error('Attachment download failed', e);
+                btn.textContent = 'attachment unavailable';
+            } finally {
+                btn.disabled = false;
+            }
+        });
+        body.appendChild(btn);
     };
 
     const createMessageEl = (m, plaintext) => {
@@ -131,11 +225,19 @@
 
         const body = document.createElement('span');
         body.className = 'body';
-        body.textContent = plaintext;
+        const filePayload = parseFilePayload(plaintext);
+        if (filePayload) {
+            renderFileBody(li, body, filePayload);
+        } else {
+            body.textContent = plaintext;
+        }
 
         li.append(author, time, body);
         if (remainingMs != null && remainingMs <= MAX_TIMEOUT_MS) {
-            setTimeout(() => li.remove(), remainingMs);
+            setTimeout(() => {
+                revokeUrls(li);
+                li.remove();
+            }, remainingMs);
         }
         return li;
     };
@@ -464,6 +566,79 @@
             stopTyping();
             sendInputEl.value = '';
             sendInputEl.focus();
+        });
+
+        const uploadFile = async (file) => {
+            if (!client.connected || !cryptoKey) {
+                return;
+            }
+            if (file.size > MAX_FILE_BYTES) {
+                setStatus('error', `File too large (max ${humanizeSize(MAX_FILE_BYTES)})`);
+                return;
+            }
+            attachBtnEl.disabled = true;
+            const previousStatus = statusEl.textContent;
+            setStatus(statusEl.dataset.state, 'Uploading…');
+            try {
+                const fileKeyRaw = OneLineCrypto.randomRawKey();
+                const fileKey = await OneLineCrypto.importRawKey(fileKeyRaw);
+                const ciphertext = await OneLineCrypto.encryptBytes(fileKey, new Uint8Array(await file.arrayBuffer()));
+
+                const prepResp = await fetch(`/api/chats/${publicId}/attachments`, {
+                    method: 'POST',
+                    headers: apiHeaders({ 'Content-Type': 'application/json' }),
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ size: ciphertext.length }),
+                });
+                if (!prepResp.ok) {
+                    throw new Error(`prepare ${prepResp.status}`);
+                }
+                const { attachmentId, uploadUrl } = await prepResp.json();
+
+                const putResp = await fetch(uploadUrl, { method: 'PUT', body: ciphertext });
+                if (!putResp.ok) {
+                    throw new Error(`upload ${putResp.status}`);
+                }
+
+                const confirmResp = await fetch(`/api/chats/${publicId}/attachments/${attachmentId}/confirm`, {
+                    method: 'POST',
+                    headers: apiHeaders(),
+                    credentials: 'same-origin',
+                });
+                if (!confirmResp.ok) {
+                    throw new Error(`confirm ${confirmResp.status}`);
+                }
+
+                const payload = JSON.stringify({
+                    k: FILE_MARKER,
+                    id: attachmentId,
+                    name: file.name,
+                    mime: file.type || 'application/octet-stream',
+                    size: file.size,
+                    key: OneLineCrypto.base64Encode(fileKeyRaw),
+                });
+                const content = await OneLineCrypto.encrypt(cryptoKey, payload);
+                const messageId = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random());
+                client.publish({
+                    destination: `/app/chat.${chatId}.send`,
+                    body: JSON.stringify({ clientMessageId: messageId, content }),
+                });
+                setStatus('online', 'Online');
+            } catch (e) {
+                console.error('Attachment upload failed', e);
+                setStatus('error', 'Upload failed');
+            } finally {
+                attachBtnEl.disabled = false;
+            }
+        };
+
+        attachBtnEl.addEventListener('click', () => attachInputEl.click());
+        attachInputEl.addEventListener('change', async () => {
+            const file = attachInputEl.files && attachInputEl.files[0];
+            attachInputEl.value = '';
+            if (file) {
+                await uploadFile(file);
+            }
         });
     };
 

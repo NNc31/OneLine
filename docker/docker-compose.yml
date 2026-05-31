@@ -24,6 +24,19 @@ services:
       timeout: 3s
       retries: 10
 
+  minio:
+    image: minio/minio
+    container_name: oneline-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: oneline
+      MINIO_ROOT_PASSWORD: oneline_secret
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
   app:
     build:
       context: ..
@@ -34,14 +47,21 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_started
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/oneline_db
       DB_USER: oneline_user
       DB_PASSWORD: oneline_pass
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      MINIO_ACCESS_KEY: oneline
+      MINIO_SECRET_KEY: oneline_secret
     ports:
       - "8080:8080"
 
 volumes:
   pg_data:
+  minio_data:

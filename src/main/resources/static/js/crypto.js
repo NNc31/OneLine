@@ -106,5 +106,35 @@ window.OneLineCrypto = (() => {
         return new TextDecoder().decode(plain);
     };
 
-    return { randomSecret, deriveAuthToken, deriveKey, encrypt, decrypt, base64Encode, base64Decode };
+    const importRawKey = (raw) => crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+
+    const randomRawKey = () => crypto.getRandomValues(new Uint8Array(KEY_BITS / 8));
+
+    const encryptBytes = async (key, data) => {
+        const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
+        const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: nonce, tagLength: 128 }, key, data)
+        );
+        return concat(new Uint8Array([VERSION]), nonce, ciphertext);
+    };
+
+    const decryptBytes = async (key, bytes) => {
+        const buf = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+        if (buf.length < 1 + NONCE_BYTES + 16) {
+            throw new Error('Ciphertext too short');
+        }
+        if (buf[0] !== VERSION) {
+            throw new Error('Unsupported version: ' + buf[0]);
+        }
+        const nonce = buf.slice(1, 1 + NONCE_BYTES);
+        const ciphertext = buf.slice(1 + NONCE_BYTES);
+        return new Uint8Array(await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: nonce, tagLength: 128 }, key, ciphertext)
+        );
+    };
+
+    return {
+        randomSecret, deriveAuthToken, deriveKey, encrypt, decrypt, base64Encode, base64Decode,
+        importRawKey, randomRawKey, encryptBytes, decryptBytes,
+    };
 })();

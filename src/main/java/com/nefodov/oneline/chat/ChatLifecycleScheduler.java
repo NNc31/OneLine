@@ -1,5 +1,6 @@
 package com.nefodov.oneline.chat;
 
+import com.nefodov.oneline.attachment.AttachmentCleanupService;
 import com.nefodov.oneline.support.OneLineProperties;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,15 +16,17 @@ import java.time.Instant;
 public class ChatLifecycleScheduler {
 
     private final ChatService chatService;
+    private final AttachmentCleanupService attachmentCleanupService;
     private final OneLineProperties properties;
     private final Clock clock;
 
     @Scheduled(cron = "${oneline.retention.cron}", zone = "${oneline.retention.zone}")
     public void deleteInactiveChats() {
         Instant cutoff = clock.instant().minus(properties.retention().inactivityWindow());
-        int deleted = chatService.deleteInactiveBefore(cutoff);
-        if (deleted > 0) {
-            log.info("Removed {} inactive chat(s) older than {}", deleted, cutoff);
+        int deletedObjects = attachmentCleanupService.removeObjectsForInactiveChats(cutoff);
+        int deletedChats = chatService.deleteInactiveBefore(cutoff);
+        if (deletedChats > 0) {
+            log.info("Removed {} inactive chat(s) older than {} ({} attachment object(s) purged)", deletedChats, cutoff, deletedObjects);
         }
     }
 }

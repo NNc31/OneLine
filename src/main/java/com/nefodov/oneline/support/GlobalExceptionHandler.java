@@ -31,6 +31,11 @@ public class GlobalExceptionHandler {
         return body(HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
     }
 
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<Map<String, String>> handleStorage(StorageException e) {
+        return body(HttpStatus.SERVICE_UNAVAILABLE, "Attachment storage is temporarily unavailable");
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
