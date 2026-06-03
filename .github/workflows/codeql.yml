@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ${{ matrix.language }}
+        language: [ 'java-kotlin' ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: java
+          languages: ${{ matrix.language }}
           queries: security-extended
       - run: ./gradlew build -x test --no-daemon
       - uses: github/codeql-action/analyze@v3
