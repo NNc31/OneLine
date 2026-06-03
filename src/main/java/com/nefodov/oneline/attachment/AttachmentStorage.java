@@ -1,7 +1,7 @@
 package com.nefodov.oneline.attachment;
 
-import com.nefodov.oneline.support.OneLineProperties;
-import com.nefodov.oneline.support.StorageException;
+import com.nefodov.oneline.config.OneLineProperties;
+import com.nefodov.oneline.web.exception.StorageException;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.RemoveObjectsArgs;

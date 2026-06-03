@@ -1,7 +1,7 @@
 package com.nefodov.oneline.chat;
 
-import com.nefodov.oneline.support.NotFoundException;
-import com.nefodov.oneline.support.TokenHasher;
+import com.nefodov.oneline.web.exception.NotFoundException;
+import com.nefodov.oneline.security.TokenHasher;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

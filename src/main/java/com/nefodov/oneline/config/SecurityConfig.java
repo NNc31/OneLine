@@ -1,7 +1,6 @@
 package com.nefodov.oneline.config;
 
 import com.nefodov.oneline.security.MagicLinkAuthenticationFilter;
-import com.nefodov.oneline.support.OneLineProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;

@@ -1,8 +1,8 @@
 package com.nefodov.oneline.security;
 
 import com.nefodov.oneline.chat.*;
-import com.nefodov.oneline.support.OneLineProperties;
-import com.nefodov.oneline.support.SessionCookieFactory;
+import com.nefodov.oneline.config.OneLineProperties;
+import com.nefodov.oneline.security.SessionCookieFactory;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;

@@ -1,6 +1,5 @@
 package com.nefodov.oneline.config;
 
-import com.nefodov.oneline.support.OneLineProperties;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;

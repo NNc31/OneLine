@@ -1,7 +1,7 @@
 package com.nefodov.oneline.chat;
 
 import com.nefodov.oneline.attachment.AttachmentCleanupService;
-import com.nefodov.oneline.support.OneLineProperties;
+import com.nefodov.oneline.config.OneLineProperties;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

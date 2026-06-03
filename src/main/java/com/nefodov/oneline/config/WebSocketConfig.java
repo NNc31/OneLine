@@ -1,7 +1,7 @@
 package com.nefodov.oneline.config;
 
-import com.nefodov.oneline.messaging.SessionCookieHandshakeInterceptor;
-import com.nefodov.oneline.messaging.StompAuthChannelInterceptor;
+import com.nefodov.oneline.stomp.SessionCookieHandshakeInterceptor;
+import com.nefodov.oneline.stomp.StompAuthChannelInterceptor;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;

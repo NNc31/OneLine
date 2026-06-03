@@ -2,7 +2,7 @@ package com.nefodov.oneline.attachment;
 
 import com.nefodov.oneline.chat.Chat;
 import com.nefodov.oneline.chat.ChatParticipant;
-import com.nefodov.oneline.support.OneLineProperties;
+import com.nefodov.oneline.config.OneLineProperties;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import jakarta.persistence.EntityManager;

@@ -1,6 +1,6 @@
 package com.nefodov.oneline.config;
 
-import com.nefodov.oneline.messaging.OneLineStompErrorHandler;
+import com.nefodov.oneline.stomp.OneLineStompErrorHandler;
 import lombok.AllArgsConstructor;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;

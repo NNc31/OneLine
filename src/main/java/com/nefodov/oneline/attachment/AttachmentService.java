@@ -1,8 +1,8 @@
 package com.nefodov.oneline.attachment;
 
 import com.nefodov.oneline.chat.ChatSession;
-import com.nefodov.oneline.support.NotFoundException;
-import com.nefodov.oneline.support.OneLineProperties;
+import com.nefodov.oneline.web.exception.NotFoundException;
+import com.nefodov.oneline.config.OneLineProperties;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

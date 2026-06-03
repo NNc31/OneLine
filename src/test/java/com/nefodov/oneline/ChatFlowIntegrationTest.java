@@ -1,6 +1,6 @@
 package com.nefodov.oneline;
 
-import com.nefodov.oneline.support.RateLimiter;
+import com.nefodov.oneline.ratelimit.RateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
