@@ -44,6 +44,12 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     logging: *default-logging
 
   app:
@@ -57,7 +63,7 @@ services:
       redis:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/oneline_db
       DB_USER: oneline_user
