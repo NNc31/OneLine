@@ -1,6 +1,6 @@
 # OneLine
 
-Anonymous magic-link chat. Create a room, share the link, and anyone with it can join. No accounts, no email, no phone.
+Anonymous magic-link chat with end-to-end encryption. Create a room, share the link, anyone with it can join. No accounts, no email, no phone.
 
 ## Highlights
 
@@ -8,8 +8,7 @@ Anonymous magic-link chat. Create a room, share the link, and anyone with it can
   A 256-bit secret is generated in the browser and lives only in the URL fragment (`/c/{publicId}#{secret}`).
   Client derives via HKDF-SHA256 two independent values: an **auth token** and an **AES-256-GCM message key**. 
   Auth token is sent to the server for authentication and routing, message key stays in the browser for encryption and decryption.
-- **"Session chats" live in the browser.** JS layer saves `{publicId, secret, displayName}` to `localStorage`.
-  `/me` page renders list of stored chats.
+- **"Session chats" live in the browser.** JS layer saves `{publicId, secret, displayName}` to `localStorage`. The `/me` page lists stored chats.
 - **Sliding, idempotent session.** Random session token generated during joining, 
   stored hashed in the DB and handed back as an `HttpOnly` cookie.
   Every authenticated request re-issues the cookie with a fresh `Max-Age`,
@@ -22,45 +21,73 @@ Anonymous magic-link chat. Create a room, share the link, and anyone with it can
   The same name is allowed in the same chat only if the previous holder has been inactive for more than the configured activity window.
 - **Server-rendered UI.** Thymeleaf for HTML, regular JS only for the STOMP client and small features. No build step.
 - **Postgres + Flyway** for persistence and schema versioning.
+- **Observability.** Prometheus + Micrometer (`/actuator/prometheus`), custom counters for messages sent, attachments uploaded, rate-limits rejections and WS connections.
+
+## Chat features
+- **End-to-end encrypted attachments.** Files are encrypted in the browser with a random per-file key. 
+  The ciphertext blob is uploaded directly to MinIO via short-lived presigned URLs. 
+  Image previews are rendered inline from decrypted blobs.
+- **Self-destruct messages.** Each chat can set a TTL (minutes/hours/days). 
+  The frontend filters expired messages on render. A backend removes them and their attachment objects in MinIO periodically.
+- **Presence with typing indicators.** Heartbeats over STOMP. Stale participants drop after a configurable window.
 
 ## Stack
 
 - Java 21, Spring Boot 4.0, Spring Security, Spring WebSocket (STOMP)
-- Hibernate ORM 7, Postgres 16, Flyway 11, Redis 7
-- Thymeleaf, minimal CSS, `@stomp/stompjs`
+- Hibernate ORM 7, Postgres 16, Flyway 11, Redis 7, MinIO
+- Bucket4j (Redis-backed), Micrometer + Prometheus
+- Thymeleaf, minimal CSS, self-hosted `@stomp/stompjs`
 
 ## Running locally
 
 Requirements: Docker and a Java 21 JDK.
 
 1. Clone the repo and `cd` into it.
-2. Run the following to start Postgres, Redis and OneLine.
+2. Run the following to start Postgres, Redis, MinIO and OneLine.
 ```bash
-# Postgres + Redis + App
+# Postgres + Redis + MinIO + App
 docker compose -f docker/docker-compose.yml up -d --build
 ```
 
-3. Open <http://localhost:8080>, hit **Create chat**, share the resulting URL.
+Useful endpoints:
+- App: <http://localhost:8080>
+- MinIO console: <http://localhost:9001>
+- Prometheus metrics: <http://localhost:8080/actuator/prometheus>
 
-Configuration properties can be found in [`src/main/resources/application.yaml`](src/main/resources/application.yaml):
+## Configuration
 
-| Key                                                         | Purpose                                                                  |
-|-------------------------------------------------------------|--------------------------------------------------------------------------|
-| `oneline.participant.activity-window`                       | How long a display name stays reserved after the holder went idle        |
-| `oneline.session.cookie-max-age`                            | Lifetime of the session cookie in the browser                            |
-| `oneline.rate-limit.create-chat.*`, `.join.*`, `.message.*` | Bucket capacity and refill period, for create, join and message sending  |
-| `oneline.retention.inactivity-window`                       | How long a chat with no recent activity is kept before automatic removal |
-| `oneline.retention.cron` and `.zone`                        | Cron expression and time zone for the cleanup job                        |
+All settings live in [`src/main/resources/application.yaml`](src/main/resources/application.yaml).
+
+| Env var                                                                             | Purpose                       |
+|-------------------------------------------------------------------------------------|-------------------------------|
+| `DB_URL`, `DB_USER`, `DB_PASSWORD`                                                  | Postgres connection           |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME`, `REDIS_PASSWORD`, `REDIS_SSL_ENABLED` | Redis connection              |
+| `MINIO_ENDPOINT`                                                                    | In-cluster MinIO endpoint     |
+| `MINIO_PUBLIC_ENDPOINT`                                                             | Browser-facing MinIO endpoint |
+| `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`                              | MinIO credentials and bucket  |
+
+Application-level:
+
+| Key                                   | Purpose                                                                  |
+|---------------------------------------|--------------------------------------------------------------------------|
+| `oneline.participant.activity-window` | How long a display name stays reserved after the holder went idle        |
+| `oneline.session.cookie-max-age`      | Lifetime of the session cookie in the browser                            |
+| `oneline.rate-limit.*`                | Bucket capacity and refill period per endpoint group                     |
+| `oneline.retention.inactivity-window` | How long a chat with no recent activity is kept before automatic removal |
+| `oneline.retention.cron` and `.zone`  | Cron expression and time zone for the cleanup job                        |
+| `oneline.storage.max-file-size`       | Attachment size cap                                                      |
+| `oneline.storage.presign-ttl`         | Lifetime of presigned upload/download URLs                               |
+| `oneline.storage.unconfirmed-ttl`     | Lifetime of reserved, not uploaded attachment row                        |
 
 ## What this is not
 
 - The server still serves the JavaScript that performs the encryption. A compromised origin could leak plaintext or keys.
 - E2E protects data in transit and on the server, not a compromised endpoint.
   Malware or a malicious browser extension on a participant's device can read the decrypted messages, the secret in the URL, or the secrets cached in `localStorage`.
-- Not built for many users in one chat. The Redis pub/sub channel is enough for the current scale target, 
-  but the in-process broker still holds active subscribers per instance.
+- Not built for many users in one chat. Single-instance broker with Redis fan-out is enough for the current scale target.
 - Redis is required. Both the cross-instance broadcast and the rate limiter run through it.
 - No accounts, no recovery. By design.
+- MinIO single-node has no extra durability beyond the underlying disk
 
 ## License
 

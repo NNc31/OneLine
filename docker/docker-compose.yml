@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16
@@ -13,6 +19,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -23,6 +30,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    logging: *default-logging
 
   minio:
     image: minio/minio
@@ -36,6 +44,7 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    logging: *default-logging
 
   app:
     build:
@@ -61,6 +70,7 @@ services:
       MINIO_SECRET_KEY: oneline_secret
     ports:
       - "8080:8080"
+    logging: *default-logging
 
 volumes:
   pg_data:

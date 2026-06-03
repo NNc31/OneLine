@@ -112,9 +112,25 @@ a { color: var(--accent); }
 
 .theme-toggle:hover { color: var(--text); border-color: var(--text); }
 
-.theme-toggle[data-muted="true"] {
-    opacity: 0.5;
-    text-decoration: line-through;
+.theme-toggle svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
+[data-sound-toggle] .i-off { display: none; }
+[data-sound-toggle][data-muted="true"] .i-on { display: none; }
+[data-sound-toggle][data-muted="true"] .i-off { display: block; }
+[data-sound-toggle][data-muted="true"] { opacity: 0.6; }
+
+[data-theme-toggle] .i-dark { display: none; }
+html[data-theme="dark"] [data-theme-toggle] .i-light { display: none; }
+html[data-theme="dark"] [data-theme-toggle] .i-dark { display: block; }
+
+.session-chats-remove svg {
+    width: 16px;
+    height: 16px;
+    display: block;
 }
 
 button.primary, .primary {

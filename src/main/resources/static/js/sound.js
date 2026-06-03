@@ -34,8 +34,8 @@
     };
 
     const render = (btn) => {
-        btn.textContent = muted ? 'Muted' : 'Sound';
         btn.dataset.muted = muted ? 'true' : 'false';
+        btn.setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
     };
 
     document.addEventListener('DOMContentLoaded', () => {
