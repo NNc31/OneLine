@@ -1,9 +1,8 @@
 package com.nefodov.oneline.attachment;
 
+import com.nefodov.oneline.AbstractWebIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -21,7 +20,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -31,9 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
 @Testcontainers
-class AttachmentFlowIntegrationTest {
+class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
 
-    private static final String CHAT_TOKEN_HEADER = "X-Chat-Token";
     private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT = new ParameterizedTypeReference<>() {};
 
     @Container
@@ -55,9 +52,6 @@ class AttachmentFlowIntegrationTest {
         registry.add("oneline.storage.secret-key", MINIO::getPassword);
     }
 
-    @Autowired
-    TestRestTemplate restTemplate;
-
     private final HttpClient http = HttpClient.newHttpClient();
 
     @Test
@@ -78,14 +72,14 @@ class AttachmentFlowIntegrationTest {
         ResponseEntity<String> confirm = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId + "/confirm",
                 HttpMethod.POST,
-                new HttpEntity<>(null, authedHeaders(chat)),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
                 String.class);
         assertEquals(HttpStatus.OK, confirm.getStatusCode());
 
         ResponseEntity<Map<String, Object>> download = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId,
                 HttpMethod.GET,
-                new HttpEntity<>(null, authedHeaders(chat)),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, download.getStatusCode());
         String downloadUrl = (String) download.getBody().get("downloadUrl");
@@ -109,7 +103,7 @@ class AttachmentFlowIntegrationTest {
         ResponseEntity<String> resp = restTemplate.exchange(
                 "/api/chats/" + chatB.publicId() + "/attachments/" + attachmentId,
                 HttpMethod.GET,
-                new HttpEntity<>(null, authedHeaders(chatB)),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chatB.token(), chatB.cookie())),
                 String.class);
         assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
     }
@@ -124,7 +118,7 @@ class AttachmentFlowIntegrationTest {
         ResponseEntity<String> resp = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId + "/confirm",
                 HttpMethod.POST,
-                new HttpEntity<>(null, authedHeaders(chat)),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
                 String.class);
         assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
     }
@@ -133,7 +127,7 @@ class AttachmentFlowIntegrationTest {
         ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments",
                 HttpMethod.POST,
-                new HttpEntity<>("{\"size\":" + size + "}", authedHeaders(chat)),
+                new HttpEntity<>("{\"size\":" + size + "}", jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, resp.getStatusCode());
         assertNotNull(resp.getBody());
@@ -150,8 +144,7 @@ class AttachmentFlowIntegrationTest {
         assertEquals(HttpStatus.OK, created.getStatusCode());
         String publicId = (String) created.getBody().get("publicId");
 
-        HttpHeaders joinHeaders = jsonHeaders();
-        joinHeaders.add(CHAT_TOKEN_HEADER, authToken);
+        HttpHeaders joinHeaders = jsonHeadersWithChatToken(authToken);
         ResponseEntity<Map<String, Object>> joined = restTemplate.exchange(
                 "/api/chats/" + publicId + "/join",
                 HttpMethod.POST,
@@ -160,25 +153,6 @@ class AttachmentFlowIntegrationTest {
         assertEquals(HttpStatus.OK, joined.getStatusCode());
         String cookie = extractCookie(joined.getHeaders().getFirst(HttpHeaders.SET_COOKIE));
         return new Joined(publicId, authToken, cookie);
-    }
-
-    private static HttpHeaders jsonHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-        return headers;
-    }
-
-    private static HttpHeaders authedHeaders(Joined chat) {
-        HttpHeaders headers = jsonHeaders();
-        headers.add(CHAT_TOKEN_HEADER, chat.token());
-        headers.add(HttpHeaders.COOKIE, chat.cookie());
-        return headers;
-    }
-
-    private static String extractCookie(String setCookieHeader) {
-        int semi = setCookieHeader.indexOf(';');
-        return semi < 0 ? setCookieHeader : setCookieHeader.substring(0, semi);
     }
 
     private static byte[] randomBytes(int len) {

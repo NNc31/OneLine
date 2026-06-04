@@ -24,6 +24,12 @@
     const ttlNoteEl = document.getElementById('ttl-note');
     const attachBtnEl = document.getElementById('attach-btn');
     const attachInputEl = document.getElementById('attach-input');
+    const uploadProgressEl = document.getElementById('upload-progress');
+    const uploadProgressLabelEl = document.getElementById('upload-progress-label');
+    const uploadProgressFillEl = document.getElementById('upload-progress-fill');
+    const uploadCancelEl = document.getElementById('upload-cancel');
+    const lightboxEl = document.getElementById('lightbox');
+    const lightboxImgEl = lightboxEl ? lightboxEl.querySelector('img') : null;
 
     const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
         hour: '2-digit',
@@ -44,9 +50,15 @@
         return;
     }
 
+    const readCookie = (name) => {
+        const match = document.cookie.split('; ').find(r => r.startsWith(name + '='));
+        return match ? decodeURIComponent(match.slice(name.length + 1)) : '';
+    };
+
     const apiHeaders = (extra) => ({
         'X-Chat-Token': authToken,
         'Accept': 'application/json',
+        'X-XSRF-TOKEN': readCookie('XSRF-TOKEN'),
         ...(extra || {}),
     });
 
@@ -136,6 +148,53 @@
         li._objectUrls = [];
     };
 
+    const openLightbox = (src, alt) => {
+        if (!lightboxEl || !lightboxImgEl) {
+            return;
+        }
+        lightboxImgEl.src = src;
+        lightboxImgEl.alt = alt || '';
+        lightboxEl.hidden = false;
+    };
+    const closeLightbox = () => {
+        if (!lightboxEl || !lightboxImgEl) {
+            return;
+        }
+        lightboxEl.hidden = true;
+        lightboxImgEl.removeAttribute('src');
+    };
+    if (lightboxEl) {
+        lightboxEl.addEventListener('click', closeLightbox);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !lightboxEl.hidden) {
+                closeLightbox();
+            }
+        });
+    }
+
+    const xhrPut = (url, body, onProgress) => {
+        const xhr = new XMLHttpRequest();
+        const promise = new Promise((resolve, reject) => {
+            xhr.open('PUT', url);
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable && onProgress) {
+                    onProgress(e.loaded / e.total);
+                }
+            };
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else {
+                    reject(new Error('upload ' + xhr.status));
+                }
+            };
+            xhr.onerror = () => reject(new Error('upload network error'));
+            xhr.onabort = () => reject(Object.assign(new Error('upload aborted'), { aborted: true }));
+            xhr.send(body);
+        });
+        return { xhr, promise };
+    };
+
     const downloadAndDecrypt = async (payload) => {
         const resp = await fetch(`/api/chats/${publicId}/attachments/${payload.id}`, {
             method: 'GET',
@@ -167,6 +226,7 @@
                 const url = URL.createObjectURL(new Blob([plain], { type: payload.mime }));
                 trackUrl(li, url);
                 img.src = url;
+                img.addEventListener('click', () => openLightbox(url, payload.name));
             }).catch((e) => {
                 console.error('Attachment load failed', e);
                 body.textContent = '⚠ attachment unavailable';
@@ -399,11 +459,11 @@
             return;
         }
         if (names.length === 1) {
-            typingEl.textContent = `${names[0]} is typing…`;
+            typingEl.textContent = `${names[0]} is typing...`;
         } else if (names.length === 2) {
-            typingEl.textContent = `${names[0]} and ${names[1]} are typing…`;
+            typingEl.textContent = `${names[0]} and ${names[1]} are typing...`;
         } else {
-            typingEl.textContent = 'Several people are typing…';
+            typingEl.textContent = 'Several people are typing...';
         }
         typingEl.hidden = false;
     };
@@ -568,6 +628,37 @@
             sendInputEl.focus();
         });
 
+        let activeUpload = null;
+        const showProgress = (label) => {
+            if (!uploadProgressEl) {
+                return;
+            }
+            uploadProgressLabelEl.textContent = label;
+            uploadProgressFillEl.style.width = '0%';
+            uploadProgressEl.hidden = false;
+        };
+        const setProgress = (ratio, name) => {
+            if (!uploadProgressEl) {
+                return;
+            }
+            const pct = Math.round(ratio * 100);
+            uploadProgressFillEl.style.width = pct + '%';
+            uploadProgressLabelEl.textContent = `Uploading ${name} — ${pct}%`;
+        };
+        const hideProgress = () => {
+            if (uploadProgressEl) {
+                uploadProgressEl.hidden = true;
+            }
+        };
+
+        if (uploadCancelEl) {
+            uploadCancelEl.addEventListener('click', () => {
+                if (activeUpload) {
+                    activeUpload.abort();
+                }
+            });
+        }
+
         const uploadFile = async (file) => {
             if (!client.connected || !cryptoKey) {
                 return;
@@ -577,8 +668,7 @@
                 return;
             }
             attachBtnEl.disabled = true;
-            const previousStatus = statusEl.textContent;
-            setStatus(statusEl.dataset.state, 'Uploading…');
+            showProgress(`Encrypting ${file.name}...`);
             try {
                 const fileKeyRaw = OneLineCrypto.randomRawKey();
                 const fileKey = await OneLineCrypto.importRawKey(fileKeyRaw);
@@ -591,22 +681,26 @@
                     body: JSON.stringify({ size: ciphertext.length }),
                 });
                 if (!prepResp.ok) {
-                    throw new Error(`prepare ${prepResp.status}`);
+                    throw new Error('prepare ' + prepResp.status);
                 }
                 const { attachmentId, uploadUrl } = await prepResp.json();
 
-                const putResp = await fetch(uploadUrl, { method: 'PUT', body: ciphertext });
-                if (!putResp.ok) {
-                    throw new Error(`upload ${putResp.status}`);
+                const putHandle = xhrPut(uploadUrl, ciphertext, (r) => setProgress(r, file.name));
+                activeUpload = putHandle.xhr;
+                try {
+                    await putHandle.promise;
+                } finally {
+                    activeUpload = null;
                 }
 
+                uploadProgressLabelEl.textContent = `Finalizing ${file.name}...`;
                 const confirmResp = await fetch(`/api/chats/${publicId}/attachments/${attachmentId}/confirm`, {
                     method: 'POST',
                     headers: apiHeaders(),
                     credentials: 'same-origin',
                 });
                 if (!confirmResp.ok) {
-                    throw new Error(`confirm ${confirmResp.status}`);
+                    throw new Error('confirm ' + confirmResp.status);
                 }
 
                 const payload = JSON.stringify({
@@ -623,11 +717,16 @@
                     destination: `/app/chat.${chatId}.send`,
                     body: JSON.stringify({ clientMessageId: messageId, content }),
                 });
-                setStatus('online', 'Online');
             } catch (e) {
-                console.error('Attachment upload failed', e);
-                setStatus('error', 'Upload failed');
+                if (e && e.aborted) {
+                    setStatus(statusEl.dataset.state || 'online', 'Upload cancelled');
+                } else {
+                    console.error('Attachment upload failed', e);
+                    setStatus('error', `Upload failed: ${e.message || 'unknown error'}`);
+                }
             } finally {
+                activeUpload = null;
+                hideProgress();
                 attachBtnEl.disabled = false;
             }
         };

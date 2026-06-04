@@ -36,9 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate
 @Testcontainers
-class ChatFlowIntegrationTest {
-
-    private static final String CHAT_TOKEN_HEADER = "X-Chat-Token";
+class ChatFlowIntegrationTest extends AbstractWebIntegrationTest {
 
     private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<Map<String, Object>>> JSON_LIST = new ParameterizedTypeReference<>() {};
@@ -55,9 +53,6 @@ class ChatFlowIntegrationTest {
     int port;
 
     @Autowired
-    TestRestTemplate restTemplate;
-
-    @Autowired
     RateLimiter rateLimiter;
 
     @Test
@@ -68,7 +63,7 @@ class ChatFlowIntegrationTest {
         ResponseEntity<Map<String, Object>> joinResp = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/join",
                 HttpMethod.POST,
-                new HttpEntity<>("{\"displayName\":\"Maelle\"}", jsonHeadersWithToken(chat.token())),
+                new HttpEntity<>("{\"displayName\":\"Maelle\"}", jsonHeadersWithChatToken(chat.token())),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, joinResp.getStatusCode());
         long chatId = ((Number) joinResp.getBody().get("chatId")).longValue();
@@ -101,14 +96,14 @@ class ChatFlowIntegrationTest {
         ResponseEntity<String> first = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/join",
                 HttpMethod.POST,
-                new HttpEntity<>("{\"displayName\":\"Maelle\"}", jsonHeadersWithToken(chat.token())),
+                new HttpEntity<>("{\"displayName\":\"Maelle\"}", jsonHeadersWithChatToken(chat.token())),
                 String.class);
         assertEquals(HttpStatus.OK, first.getStatusCode());
 
         ResponseEntity<String> second = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/join",
                 HttpMethod.POST,
-                new HttpEntity<>("{\"displayName\":\"Maelle\"}", jsonHeadersWithToken(chat.token())),
+                new HttpEntity<>("{\"displayName\":\"Maelle\"}", jsonHeadersWithChatToken(chat.token())),
                 String.class);
         assertEquals(HttpStatus.CONFLICT, second.getStatusCode());
     }
@@ -121,7 +116,7 @@ class ChatFlowIntegrationTest {
         ResponseEntity<String> resp = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/messages",
                 HttpMethod.GET,
-                new HttpEntity<>(null, jsonHeadersWithToken(chat.token())),
+                new HttpEntity<>(null, jsonHeadersWithChatToken(chat.token())),
                 String.class);
         assertEquals(HttpStatus.UNAUTHORIZED, resp.getStatusCode());
     }
@@ -134,7 +129,7 @@ class ChatFlowIntegrationTest {
         ResponseEntity<String> resp = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/join",
                 HttpMethod.POST,
-                new HttpEntity<>("{\"displayName\":\"Maelle\"}", jsonHeadersWithToken("wrong-token")),
+                new HttpEntity<>("{\"displayName\":\"Maelle\"}", jsonHeadersWithChatToken("wrong-token")),
                 String.class);
         assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
     }
@@ -182,7 +177,7 @@ class ChatFlowIntegrationTest {
             ResponseEntity<List<Map<String, Object>>> resp = restTemplate.exchange(
                     "/api/chats/" + publicId + "/messages",
                     HttpMethod.GET,
-                    new HttpEntity<>(null, jsonHeadersWithTokenAndCookie(chatToken, cookie)),
+                    new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chatToken, cookie)),
                     JSON_LIST);
             history = resp.getBody() == null ? List.of() : resp.getBody();
             if (history.size() >= expectedSize) {
@@ -191,30 +186,6 @@ class ChatFlowIntegrationTest {
             Thread.sleep(100);
         }
         return history;
-    }
-
-    private static HttpHeaders jsonHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-        return headers;
-    }
-
-    private static HttpHeaders jsonHeadersWithToken(String chatToken) {
-        HttpHeaders headers = jsonHeaders();
-        headers.add(CHAT_TOKEN_HEADER, chatToken);
-        return headers;
-    }
-
-    private static HttpHeaders jsonHeadersWithTokenAndCookie(String chatToken, String cookie) {
-        HttpHeaders headers = jsonHeadersWithToken(chatToken);
-        headers.add(HttpHeaders.COOKIE, cookie);
-        return headers;
-    }
-
-    private static String extractCookie(String setCookieHeader) {
-        int semi = setCookieHeader.indexOf(';');
-        return semi < 0 ? setCookieHeader : setCookieHeader.substring(0, semi);
     }
 
     private record CreatedChat(String publicId, String token) {

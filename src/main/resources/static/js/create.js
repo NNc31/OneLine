@@ -7,6 +7,11 @@
         return;
     }
 
+    const readCookie = (name) => {
+        const match = document.cookie.split('; ').find(r => r.startsWith(name + '='));
+        return match ? decodeURIComponent(match.slice(name.length + 1)) : '';
+    };
+
     const readTtlSeconds = () => {
         const n = parseInt(ttlValueEl && ttlValueEl.value, 10);
         if (!Number.isFinite(n) || n <= 0) {
@@ -27,7 +32,7 @@
             const payload = messageTtlSeconds ? { authToken, messageTtlSeconds } : { authToken };
             const resp = await fetch('/api/chats', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-XSRF-TOKEN': readCookie('XSRF-TOKEN'),},
                 credentials: 'same-origin',
                 body: JSON.stringify(payload),
             });

@@ -1,4 +1,4 @@
-package com.nefodov.oneline.chat.presence;
+package com.nefodov.oneline.chat;
 
 import com.nefodov.oneline.chat.PresenceService;
 import com.nefodov.oneline.chat.dto.ParticipantView;

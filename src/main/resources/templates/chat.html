@@ -61,7 +61,7 @@
         <section id="join-card" class="join-card" hidden>
             <h2>Pick a name</h2>
             <form id="join-form">
-                <input type="text" id="join-display-name" maxlength="40" required autofocus aria-label="Display name" placeholder="e.g. Ethan, Ivette, etc.">
+                <input type="text" id="join-display-name" maxlength="40" required autofocus aria-label="Display name" aria-describedby="join-hint" placeholder="e.g. Ethan, Ivette, etc.">
                 <button type="submit" class="primary">Join chat</button>
             </form>
             <p id="join-error" class="error-message" hidden></p>
@@ -75,6 +75,11 @@
 </main>
 
 <div id="typing-indicator" class="typing" hidden></div>
+<div id="upload-progress" class="upload-progress" hidden>
+    <span id="upload-progress-label">Uploading...</span>
+    <div class="bar"><span id="upload-progress-fill"></span></div>
+    <button type="button" id="upload-cancel" class="cancel">Cancel</button>
+</div>
 <form id="send-form" class="send" autocomplete="off" hidden>
     <input id="attach-input" type="file" hidden aria-hidden="true">
     <button type="button" id="attach-btn" class="attach" aria-label="Attach a file (up to 100 MB)" title="Attach a file (up to 100 MB)">
@@ -86,6 +91,7 @@
     <button type="submit" class="primary">Send</button>
 </form>
 <div id="conn-status" class="conn-status" data-state="connecting" hidden>Connecting...</div>
+<div id="lightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-label="Image preview"><img alt=""></div>
 
 <script th:src="@{/js/stomp.umd.min.js}"></script>
 <script th:src="@{/js/crypto.js}"></script>

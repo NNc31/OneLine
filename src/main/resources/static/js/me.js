@@ -53,7 +53,7 @@
 
             const id = document.createElement('span');
             id.className = 'session-chats-id';
-            id.textContent = chat.publicId.slice(0, 8) + '…';
+            id.textContent = chat.publicId.slice(0, 8) + '...';
 
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';

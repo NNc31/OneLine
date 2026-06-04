@@ -1,6 +1,9 @@
 spring:
   application:
     name: OneLine
+  threads:
+    virtual:
+      enabled: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/oneline_db}
     username: ${DB_USER:oneline_user}
