@@ -7,8 +7,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -16,10 +18,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.doAnswer;
 
 @SpringBootTest
 @Testcontainers
@@ -27,6 +30,21 @@ class PresenceServiceTest {
 
     private static final long T0 = 1_000_000_000L;
     private static final long STALE_MS = 60_000L;
+    private static final AtomicLong NOW = new AtomicLong();
+
+    @TestConfiguration
+    static class TestClockConfig {
+        @Bean
+        @Primary
+        public Clock clock() {
+            return new Clock() {
+                @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+                @Override public Clock withZone(ZoneId zone) { return this; }
+                @Override public long millis() { return NOW.get(); }
+                @Override public Instant instant() { return Instant.ofEpochMilli(NOW.get()); }
+            };
+        }
+    }
 
     @Container
     @ServiceConnection
@@ -36,19 +54,12 @@ class PresenceServiceTest {
     @ServiceConnection(name = "redis")
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
-    @MockitoBean
-    Clock clock;
-
     @Autowired
     PresenceService presence;
 
-    private final AtomicLong now = new AtomicLong();
-
     @BeforeEach
-    void fixClock() {
-        doAnswer(invocation -> now.get()).when(clock).millis();
-        doAnswer(invocation -> Instant.ofEpochMilli(now.get())).when(clock).instant();
-        now.set(T0);
+    void resetClock() {
+        NOW.set(T0);
     }
 
     @Test
@@ -64,7 +75,7 @@ class PresenceServiceTest {
     void evictStaleRemovesLapsed() {
         long chatId = 1002L;
         presence.markOnline(chatId, 7L, "Alice");
-        now.set(T0 + STALE_MS + 1_000L);
+        NOW.set(T0 + STALE_MS + 1_000L);
         int evicted = presence.evictStale(chatId);
         assertThat(evicted).isEqualTo(1);
         assertThat(presence.online(chatId)).isEmpty();
@@ -75,9 +86,9 @@ class PresenceServiceTest {
     void freshHeartbeatSurvivesEviction() {
         long chatId = 1003L;
         presence.markOnline(chatId, 1L, "Stale");
-        now.set(T0 + 40_000L);
+        NOW.set(T0 + 40_000L);
         presence.markOnline(chatId, 2L, "Fresh");
-        now.set(T0 + STALE_MS + 1_000L);
+        NOW.set(T0 + STALE_MS + 1_000L);
         int evicted = presence.evictStale(chatId);
         assertThat(evicted).isEqualTo(1);
         assertThat(presence.online(chatId)).extracting(ParticipantView::displayName).containsExactly("Fresh");
