@@ -15,8 +15,8 @@ public record SendMessageRequest(
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof SendMessageRequest other)) return false;
-        return Objects.equals(clientMessageId, other.clientMessageId) && Arrays.equals(content, other.content);
+        if (!(o instanceof SendMessageRequest(UUID messageId, byte[] content1))) return false;
+        return Objects.equals(clientMessageId, messageId) && Arrays.equals(content, content1);
     }
 
     @Override

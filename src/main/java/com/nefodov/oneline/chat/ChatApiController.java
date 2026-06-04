@@ -69,15 +69,24 @@ public class ChatApiController {
     }
 
     @GetMapping("/{publicId}/presence")
-    public List<ParticipantView> presence(@AuthenticationPrincipal ChatSession session) {
+    public List<ParticipantView> presence(@PathVariable("publicId") UUID publicId, @AuthenticationPrincipal ChatSession session) {
+        verifyChat(publicId, session);
         return presenceService.online(session.chat().getId());
     }
 
     @GetMapping("/{publicId}/messages")
-    public List<MessageResponse> history(@RequestParam(required = false) Long before,
+    public List<MessageResponse> history(@PathVariable("publicId") UUID publicId,
+                                         @RequestParam(required = false) Long before,
                                          @RequestParam(required = false) Integer limit,
                                          @AuthenticationPrincipal ChatSession session) {
+        verifyChat(publicId, session);
         return messageService.history(session, before, limit).stream().map(this::toResponse).toList();
+    }
+
+    private void verifyChat(UUID publicId, ChatSession session) {
+        if (!session.chat().getPublicId().equals(publicId)) {
+            throw new NotFoundException("Chat not found");
+        }
     }
 
     @PostMapping

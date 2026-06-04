@@ -30,10 +30,11 @@ globalThis.OneLineCrypto = (() => {
         return out;
     };
 
-    const base64UrlEncode = (bytes) => base64Encode(bytes)
-        .replaceAll('+', '-')
-        .replaceAll('/', '_')
-        .replace(/=+$/, '');
+    const base64UrlEncode = (bytes) => {
+        const s = base64Encode(bytes).replaceAll('+', '-').replaceAll('/', '_');
+        const padStart = s.indexOf('=');
+        return padStart < 0 ? s : s.slice(0, padStart);
+    };
     const randomSecret = () => base64UrlEncode(crypto.getRandomValues(new Uint8Array(SECRET_BYTES)));
     const deriveAuthToken = async (secret) => {
         const ikm = new TextEncoder().encode(secret);

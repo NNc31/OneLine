@@ -618,7 +618,7 @@
                 console.error('Encrypt failed', err);
                 return;
             }
-            const id = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random());
+            const id = crypto.randomUUID();
             client.publish({
                 destination: `/app/chat.${chatId}.send`,
                 body: JSON.stringify({ clientMessageId: id, content: ciphertextBase64 }),
@@ -712,7 +712,7 @@
                     key: OneLineCrypto.base64Encode(fileKeyRaw),
                 });
                 const content = await OneLineCrypto.encrypt(cryptoKey, payload);
-                const messageId = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random());
+                const messageId = crypto.randomUUID();
                 client.publish({
                     destination: `/app/chat.${chatId}.send`,
                     body: JSON.stringify({ clientMessageId: messageId, content }),
