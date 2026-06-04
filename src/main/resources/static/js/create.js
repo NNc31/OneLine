@@ -13,11 +13,11 @@
     };
 
     const readTtlSeconds = () => {
-        const n = parseInt(ttlValueEl && ttlValueEl.value, 10);
+        const n = Number.parseInt(ttlValueEl?.value, 10);
         if (!Number.isFinite(n) || n <= 0) {
             return null;
         }
-        return n * parseInt(ttlUnitEl.value, 10);
+        return n * Number.parseInt(ttlUnitEl.value, 10);
     };
 
     btn.addEventListener('click', async () => {
@@ -40,7 +40,7 @@
                 throw new Error('create failed (' + resp.status + ')');
             }
             const data = await resp.json();
-            window.location.href = `/c/${data.publicId}#${secret}`;
+            globalThis.location.href = `/c/${data.publicId}#${secret}`;
         } catch (e) {
             console.error(e);
             btn.disabled = false;

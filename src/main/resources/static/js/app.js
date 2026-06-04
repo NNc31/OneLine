@@ -5,7 +5,7 @@
     }
 
     const publicId = root.dataset.publicId;
-    const secret = (window.location.hash || '').replace(/^#/, '');
+    const secret = (globalThis.location.hash || '').replace(/^#/, '');
     let authToken = null;
 
     const missingSecretEl = document.getElementById('missing-secret');
@@ -59,7 +59,7 @@
         'X-Chat-Token': authToken,
         'Accept': 'application/json',
         'X-XSRF-TOKEN': readCookie('XSRF-TOKEN'),
-        ...(extra || {}),
+        ...extra,
     });
 
     const showJoinCard = () => {
@@ -124,8 +124,8 @@
     const parseFilePayload = (text) => {
         try {
             const obj = JSON.parse(text);
-            return obj && obj.k === FILE_MARKER ? obj : null;
-        } catch (_) {
+            return obj?.k === FILE_MARKER ? obj : null;
+        } catch {
             return null;
         }
     };
@@ -154,22 +154,18 @@
         }
         lightboxImgEl.src = src;
         lightboxImgEl.alt = alt || '';
-        lightboxEl.hidden = false;
+        lightboxEl.showModal();
     };
     const closeLightbox = () => {
         if (!lightboxEl || !lightboxImgEl) {
             return;
         }
-        lightboxEl.hidden = true;
+        lightboxEl.close();
         lightboxImgEl.removeAttribute('src');
     };
     if (lightboxEl) {
         lightboxEl.addEventListener('click', closeLightbox);
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !lightboxEl.hidden) {
-                closeLightbox();
-            }
-        });
+        lightboxEl.addEventListener('close', () => lightboxImgEl?.removeAttribute('src'));
     }
 
     const xhrPut = (url, body, onProgress) => {
@@ -367,8 +363,8 @@
             const isNew = !seenMessageIds.has(m.id);
             renderMessage(m, plaintext);
             messagesEl.scrollTop = messagesEl.scrollHeight;
-            if (isNew && m.participantId !== meId && window.OneLineSound) {
-                window.OneLineSound.play();
+            if (isNew && m.participantId !== meId && globalThis.OneLineSound) {
+                globalThis.OneLineSound.play();
             }
         } catch (e) {
             console.error('Decrypt failed for message', m.id, e);
@@ -388,7 +384,9 @@
                 lastUsed: new Date().toISOString(),
             });
             localStorage.setItem(KEY, JSON.stringify(filtered.slice(0, 50)));
-        } catch (_) { /* ignore */ }
+        } catch {
+
+        }
     };
 
     const loadHistoryAndConnect = async (me) => {
@@ -550,10 +548,12 @@
             let reason = frame.headers.message || 'Disconnected';
             try {
                 const parsed = JSON.parse(frame.body);
-                if (parsed && parsed.error) {
+                if (parsed?.error) {
                     reason = parsed.error;
                 }
-            } catch (_) { /* ignore */ }
+            } catch {
+
+            }
             setStatus('error', reason);
         };
 
@@ -782,10 +782,12 @@
                 let message = `Join failed (${r.status})`;
                 try {
                     const parsed = JSON.parse(body);
-                    if (parsed && parsed.error) {
+                    if (parsed?.error) {
                         message = parsed.error;
                     }
-                } catch (_) { /* ignore */ }
+                } catch {
+
+                }
                 throw new Error(message);
             })
             .then(joined => {

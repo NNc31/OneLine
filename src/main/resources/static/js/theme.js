@@ -2,7 +2,7 @@
     const STORAGE_KEY = 'oneline.theme';
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved === 'light' || saved === 'dark') {
-        document.documentElement.setAttribute('data-theme', saved);
+        document.documentElement.dataset.theme = saved;
     }
 
     const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -27,15 +27,15 @@
     document.addEventListener('DOMContentLoaded', () => {
         const toggles = document.querySelectorAll('[data-theme-toggle]');
         toggles.forEach(btn => btn.addEventListener('click', () => {
-            const current = document.documentElement.getAttribute('data-theme');
+            const current = document.documentElement.dataset.theme;
             const next = current === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', next);
+            document.documentElement.dataset.theme = next;
             localStorage.setItem(STORAGE_KEY, next);
         }));
 
         formatAllTimes(document);
     });
 
-    window.OneLine = window.OneLine || {};
-    window.OneLine.formatTimes = formatAllTimes;
+    globalThis.OneLine = globalThis.OneLine || {};
+    globalThis.OneLine.formatTimes = formatAllTimes;
 })();

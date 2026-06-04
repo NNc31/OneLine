@@ -1,4 +1,4 @@
-window.OneLineCrypto = (() => {
+globalThis.OneLineCrypto = (() => {
     const VERSION = 0x01;
     const NONCE_BYTES = 12;
     const KEY_BITS = 256;
@@ -15,8 +15,8 @@ window.OneLineCrypto = (() => {
 
     const base64Encode = (bytes) => {
         let binary = '';
-        for (let i = 0; i < bytes.length; i++) {
-            binary += String.fromCharCode(bytes[i]);
+        for (const b of bytes) {
+            binary += String.fromCharCode(b);
         }
         return btoa(binary);
     };
@@ -31,8 +31,8 @@ window.OneLineCrypto = (() => {
     };
 
     const base64UrlEncode = (bytes) => base64Encode(bytes)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
+        .replaceAll('+', '-')
+        .replaceAll('/', '_')
         .replace(/=+$/, '');
     const randomSecret = () => base64UrlEncode(crypto.getRandomValues(new Uint8Array(SECRET_BYTES)));
     const deriveAuthToken = async (secret) => {

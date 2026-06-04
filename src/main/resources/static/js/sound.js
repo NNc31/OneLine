@@ -53,7 +53,7 @@
         });
     });
 
-    window.OneLineSound = {
+    globalThis.OneLineSound = {
         play: () => play(),
     };
 })();

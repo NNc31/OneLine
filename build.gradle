@@ -69,6 +69,7 @@ sonar {
         property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
         property "sonar.sources", "src/main/java,src/main/resources"
         property "sonar.tests", "src/test/java"
+        property "sonar.coverage.exclusions", "**/*.html,**/*.js,**/*.css,**/*.svg,**/*.sql,**/*.properties,**/*.yaml,**/*.yml"
     }
 }
 
