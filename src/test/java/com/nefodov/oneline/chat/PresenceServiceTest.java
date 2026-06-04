@@ -15,6 +15,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +47,7 @@ class PresenceServiceTest {
     @BeforeEach
     void fixClock() {
         when(clock.millis()).thenAnswer(invocation -> now.get());
+        when(clock.instant()).thenAnswer(invocation -> Instant.ofEpochMilli(now.get()));
         now.set(T0);
     }
 
