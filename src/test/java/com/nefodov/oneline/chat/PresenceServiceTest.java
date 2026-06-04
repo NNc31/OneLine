@@ -19,7 +19,7 @@ import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 @SpringBootTest
 @Testcontainers
@@ -46,8 +46,8 @@ class PresenceServiceTest {
 
     @BeforeEach
     void fixClock() {
-        when(clock.millis()).thenAnswer(invocation -> now.get());
-        when(clock.instant()).thenAnswer(invocation -> Instant.ofEpochMilli(now.get()));
+        doAnswer(invocation -> now.get()).when(clock).millis();
+        doAnswer(invocation -> Instant.ofEpochMilli(now.get())).when(clock).instant();
         now.set(T0);
     }
 
