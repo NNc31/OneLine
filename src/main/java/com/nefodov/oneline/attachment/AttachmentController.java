@@ -27,7 +27,7 @@ public class AttachmentController {
     private final MeterRegistry meterRegistry;
 
     @PostMapping
-    public AttachmentUploadResponse prepare(@PathVariable UUID publicId, @Valid @RequestBody AttachmentUploadRequest request, @AuthenticationPrincipal ChatSession session) {
+    public AttachmentUploadResponse prepare(@PathVariable("publicId") UUID publicId, @Valid @RequestBody AttachmentUploadRequest request, @AuthenticationPrincipal ChatSession session) {
         verifyChat(publicId, session);
         enforceRateLimit(session);
         AttachmentService.PreparedUpload prepared = attachmentService.prepareUpload(session, request.size());
@@ -36,14 +36,14 @@ public class AttachmentController {
     }
 
     @PostMapping("/{attachmentId}/confirm")
-    public void confirm(@PathVariable UUID publicId, @PathVariable Long attachmentId, @AuthenticationPrincipal ChatSession session) {
+    public void confirm(@PathVariable("publicId") UUID publicId, @PathVariable("attachmentId") Long attachmentId, @AuthenticationPrincipal ChatSession session) {
         verifyChat(publicId, session);
         attachmentService.confirm(session, attachmentId);
         meterRegistry.counter("oneline.attachments.confirmed").increment();
     }
 
     @GetMapping("/{attachmentId}")
-    public AttachmentDownloadResponse download(@PathVariable UUID publicId, @PathVariable Long attachmentId, @AuthenticationPrincipal ChatSession session) {
+    public AttachmentDownloadResponse download(@PathVariable("publicId") UUID publicId, @PathVariable("attachmentId") Long attachmentId, @AuthenticationPrincipal ChatSession session) {
         verifyChat(publicId, session);
         return new AttachmentDownloadResponse(attachmentService.presignDownload(session, attachmentId));
     }

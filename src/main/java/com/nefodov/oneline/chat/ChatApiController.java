@@ -39,7 +39,7 @@ public class ChatApiController {
     private final MeterRegistry meterRegistry;
 
     @GetMapping("/{publicId}")
-    public ChatMetaResponse meta(@PathVariable UUID publicId,
+    public ChatMetaResponse meta(@PathVariable("publicId") UUID publicId,
                                  @RequestHeader(value = CHAT_TOKEN_HEADER, required = false) String chatToken,
                                  @AuthenticationPrincipal ChatSession session) {
         Chat chat = resolveChat(publicId, chatToken);
@@ -48,7 +48,7 @@ public class ChatApiController {
     }
 
     @PostMapping("/{publicId}/join")
-    public ResponseEntity<JoinChatResponse> join(@PathVariable UUID publicId,
+    public ResponseEntity<JoinChatResponse> join(@PathVariable("publicId") UUID publicId,
                                                  @RequestHeader(CHAT_TOKEN_HEADER) String chatToken,
                                                  @AuthenticationPrincipal ChatSession session,
                                                  @Valid @RequestBody JoinChatRequest request,

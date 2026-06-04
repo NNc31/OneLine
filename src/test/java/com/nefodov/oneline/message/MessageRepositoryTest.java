@@ -29,11 +29,11 @@ class MessageRepositoryTest {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
     @Container
     @ServiceConnection(name = "redis")
-    static GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @PersistenceContext
     EntityManager em;

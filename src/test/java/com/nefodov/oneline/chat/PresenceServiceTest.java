@@ -1,6 +1,5 @@
 package com.nefodov.oneline.chat;
 
-import com.nefodov.oneline.chat.PresenceService;
 import com.nefodov.oneline.chat.dto.ParticipantView;
 import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,11 +29,11 @@ class PresenceServiceTest {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
     @Container
     @ServiceConnection(name = "redis")
-    static GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @MockitoBean
     Clock clock;

@@ -67,6 +67,8 @@ sonar {
         property "sonar.organization", "nnc31"
         property "sonar.host.url", "https://sonarcloud.io"
         property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
+        property "sonar.sources", "src/main/java,src/main/resources"
+        property "sonar.tests", "src/test/java"
     }
 }
 

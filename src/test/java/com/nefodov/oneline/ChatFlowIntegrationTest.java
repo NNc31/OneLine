@@ -4,7 +4,6 @@ import com.nefodov.oneline.ratelimit.RateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -43,11 +42,11 @@ class ChatFlowIntegrationTest extends AbstractWebIntegrationTest {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
     @Container
     @ServiceConnection(name = "redis")
-    static GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @LocalServerPort
     int port;

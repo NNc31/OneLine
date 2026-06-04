@@ -7,7 +7,7 @@ import java.util.List;
 
 public class MagicLinkAuthentication extends AbstractAuthenticationToken {
 
-    private final ChatSession session;
+    private final transient ChatSession session;
 
     public MagicLinkAuthentication(ChatSession session) {
         super(List.of());
