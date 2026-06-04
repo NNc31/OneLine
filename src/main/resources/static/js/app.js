@@ -1,9 +1,4 @@
-(async () => {
-    const root = document.querySelector('.chat-main .inner[data-public-id]');
-    if (!root) {
-        return;
-    }
-
+const initChat = async (root) => {
     const publicId = root.dataset.publicId;
     const secret = (globalThis.location.hash || '').replace(/^#/, '');
     let authToken = null;
@@ -489,7 +484,7 @@
     };
 
     const handleEvent = (ev) => {
-        if (!ev || !ev.type) {
+        if (!ev?.type) {
             return;
         }
         if (ev.type === 'presence') {
@@ -718,7 +713,7 @@
                     body: JSON.stringify({ clientMessageId: messageId, content }),
                 });
             } catch (e) {
-                if (e && e.aborted) {
+                if (e?.aborted) {
                     setStatus(statusEl.dataset.state || 'online', 'Upload cancelled');
                 } else {
                     console.error('Attachment upload failed', e);
@@ -733,7 +728,7 @@
 
         attachBtnEl.addEventListener('click', () => attachInputEl.click());
         attachInputEl.addEventListener('change', async () => {
-            const file = attachInputEl.files && attachInputEl.files[0];
+            const file = attachInputEl.files?.[0];
             attachInputEl.value = '';
             if (file) {
                 await uploadFile(file);
@@ -799,4 +794,9 @@
                 joinErrorEl.hidden = false;
             });
     });
-})();
+};
+
+const chatRoot = document.querySelector('.chat-main .inner[data-public-id]');
+if (chatRoot) {
+    await initChat(chatRoot);
+}

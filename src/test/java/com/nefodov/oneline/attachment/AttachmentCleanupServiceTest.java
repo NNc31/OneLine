@@ -23,7 +23,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -32,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Testcontainers
 class AttachmentCleanupServiceTest {
+
+    private static final Instant FAR_PAST = Instant.parse("2000-01-01T00:00:00Z");
 
     @Container
     @ServiceConnection
@@ -77,7 +78,7 @@ class AttachmentCleanupServiceTest {
         Chat chat = persistChat(60L);
         ChatParticipant member = persistParticipant(chat);
         String objectKey = putObject();
-        Attachment attachment = persistAttachment(chat, member, objectKey, true, Instant.now().minus(5, ChronoUnit.MINUTES));
+        Attachment attachment = persistAttachment(chat, member, objectKey, true, FAR_PAST);
         int swept = cleanupService.sweepExpiredByChatTtl();
         assertThat(swept).isGreaterThanOrEqualTo(1);
         em.clear();
@@ -92,7 +93,7 @@ class AttachmentCleanupServiceTest {
         Chat chat = persistChat(null);
         ChatParticipant member = persistParticipant(chat);
         String objectKey = putObject();
-        Attachment attachment = persistAttachment(chat, member, objectKey, false, Instant.now().minus(1, ChronoUnit.HOURS));
+        Attachment attachment = persistAttachment(chat, member, objectKey, false, FAR_PAST);
         int swept = cleanupService.sweepUnconfirmed();
         assertThat(swept).isGreaterThanOrEqualTo(1);
         em.clear();

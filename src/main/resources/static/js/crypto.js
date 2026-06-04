@@ -16,7 +16,7 @@ globalThis.OneLineCrypto = (() => {
     const base64Encode = (bytes) => {
         let binary = '';
         for (const b of bytes) {
-            binary += String.fromCharCode(b);
+            binary += String.fromCodePoint(b);
         }
         return btoa(binary);
     };
@@ -25,7 +25,7 @@ globalThis.OneLineCrypto = (() => {
         const binary = atob(str);
         const out = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {
-            out[i] = binary.charCodeAt(i);
+            out[i] = binary.codePointAt(i);
         }
         return out;
     };

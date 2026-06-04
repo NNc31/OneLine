@@ -16,7 +16,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -26,6 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 @Transactional
 class MessageRepositoryTest {
+
+    private static final Instant FAR_PAST = Instant.parse("2000-01-01T00:00:00Z");
+    private static final Instant FAR_FUTURE = Instant.parse("9999-01-01T00:00:00Z");
 
     @Container
     @ServiceConnection
@@ -46,8 +48,8 @@ class MessageRepositoryTest {
     void deletesOnlyExpiredForTtlChats() {
         Chat chat = persistChat(60L);
         ChatParticipant member = persistParticipant(chat);
-        Message stale = persistMessage(chat, member, Instant.now().minus(5, ChronoUnit.MINUTES));
-        Message fresh = persistMessage(chat, member, Instant.now());
+        Message stale = persistMessage(chat, member, FAR_PAST);
+        Message fresh = persistMessage(chat, member, FAR_FUTURE);
         int deleted = messageRepository.deleteExpiredByChatTtl();
         assertThat(deleted).isEqualTo(1);
         em.clear();
@@ -60,7 +62,7 @@ class MessageRepositoryTest {
     void keepsMessagesWhenTtlDisabled() {
         Chat chat = persistChat(null);
         ChatParticipant member = persistParticipant(chat);
-        Message ancient = persistMessage(chat, member, Instant.now().minus(400, ChronoUnit.DAYS));
+        Message ancient = persistMessage(chat, member, FAR_PAST);
         int deleted = messageRepository.deleteExpiredByChatTtl();
         assertThat(deleted).isZero();
         em.clear();

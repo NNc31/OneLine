@@ -24,12 +24,15 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -170,21 +173,20 @@ class ChatFlowIntegrationTest extends AbstractWebIntegrationTest {
         return stompClient.connectAsync("ws://localhost:" + port + "/ws", handshakeHeaders, connectHeaders, new StompSessionHandlerAdapter() {}).get(5, TimeUnit.SECONDS);
     }
 
-    private List<Map<String, Object>> awaitHistory(String publicId, String chatToken, String cookie, int expectedSize) throws InterruptedException {
-        List<Map<String, Object>> history = List.of();
-        for (int attempt = 0; attempt < 30; attempt++) {
-            ResponseEntity<List<Map<String, Object>>> resp = restTemplate.exchange(
-                    "/api/chats/" + publicId + "/messages",
-                    HttpMethod.GET,
-                    new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chatToken, cookie)),
-                    JSON_LIST);
-            history = resp.getBody() == null ? List.of() : resp.getBody();
-            if (history.size() >= expectedSize) {
-                return history;
-            }
-            Thread.sleep(100);
-        }
-        return history;
+    private List<Map<String, Object>> awaitHistory(String publicId, String chatToken, String cookie, int expectedSize) {
+        AtomicReference<List<Map<String, Object>>> last = new AtomicReference<>(List.of());
+        await().atMost(Duration.ofSeconds(3))
+                .pollInterval(Duration.ofMillis(100))
+                .until(() -> {
+                    ResponseEntity<List<Map<String, Object>>> resp = restTemplate.exchange(
+                            "/api/chats/" + publicId + "/messages",
+                            HttpMethod.GET,
+                            new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chatToken, cookie)),
+                            JSON_LIST);
+                    last.set(resp.getBody() == null ? List.of() : resp.getBody());
+                    return last.get().size() >= expectedSize;
+                });
+        return last.get();
     }
 
     private record CreatedChat(String publicId, String token) {

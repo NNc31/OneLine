@@ -1,5 +1,6 @@
 package com.nefodov.oneline.config;
 
+import com.nefodov.oneline.security.EagerCsrfTokenRequestHandler;
 import com.nefodov.oneline.security.MagicLinkAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,7 +12,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 import java.net.URI;
@@ -24,13 +24,10 @@ public class SecurityConfig {
         String storageOrigin = origin(properties.storage().publicEndpoint());
         String csp = "default-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; img-src 'self' blob:; connect-src 'self' " + storageOrigin;
 
-        CsrfTokenRequestAttributeHandler csrfAttributeHandler = new CsrfTokenRequestAttributeHandler();
-        csrfAttributeHandler.setCsrfRequestAttributeName(null);
-
         return http
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        .csrfTokenRequestHandler(csrfAttributeHandler))
+                        .csrfTokenRequestHandler(new EagerCsrfTokenRequestHandler()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers
                         .referrerPolicy(rp -> rp.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
