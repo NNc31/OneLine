@@ -431,6 +431,23 @@ body.chat-page {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;
+}
+
+.chat-room.drag-over::after {
+    content: 'Drop file to attach';
+    position: absolute;
+    inset: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    color: var(--accent);
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 5;
 }
 
 .messages {

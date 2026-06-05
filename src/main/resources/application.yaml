@@ -26,9 +26,12 @@ spring:
       password: ${REDIS_PASSWORD:}
       ssl:
         enabled: ${REDIS_SSL_ENABLED:false}
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
 
 server:
   forward-headers-strategy: framework
+  shutdown: graceful
 
 management:
   endpoints:

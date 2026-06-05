@@ -519,7 +519,10 @@ const initChat = async (root) => {
             heartbeatOutgoing: 10000,
         });
 
+        let serverShutdownAnnounced = false;
+
         client.onConnect = () => {
+            serverShutdownAnnounced = false;
             setStatus('online', 'Online');
             client.subscribe(`/topic/chat.${chatId}`, (frame) => {
                 try {
@@ -536,9 +539,24 @@ const initChat = async (root) => {
                     console.error('Bad event frame', e);
                 }
             });
+            client.subscribe('/topic/system.events', (frame) => {
+                try {
+                    const ev = JSON.parse(frame.body);
+                    if (ev?.type === 'shutdown') {
+                        serverShutdownAnnounced = true;
+                        setStatus('offline', 'Server is restarting...');
+                    }
+                } catch (e) {
+                    console.error('System event', e);
+                }
+            });
             fetchPresence();
         };
-        client.onWebSocketClose = () => setStatus('offline', 'Offline. Reconnecting...');
+        client.onWebSocketClose = () => {
+            if (!serverShutdownAnnounced) {
+                setStatus('offline', 'Offline. Reconnecting...');
+            }
+        };
         client.onStompError = (frame) => {
             let reason = frame.headers.message || 'Disconnected';
             try {
@@ -732,6 +750,62 @@ const initChat = async (root) => {
             attachInputEl.value = '';
             if (file) {
                 await uploadFile(file);
+            }
+        });
+
+        const hasFiles = (dt) => Array.from(dt?.types || []).includes('Files');
+        let dragDepth = 0;
+        const clearDragOver = () => {
+            dragDepth = 0;
+            chatRoomEl.classList.remove('drag-over');
+        };
+        document.body.addEventListener('dragenter', (e) => {
+            if (chatRoomEl.hidden || !hasFiles(e.dataTransfer)) {
+                return;
+            }
+            dragDepth++;
+            chatRoomEl.classList.add('drag-over');
+        });
+        document.body.addEventListener('dragover', (e) => {
+            if (!chatRoomEl.hidden && hasFiles(e.dataTransfer)) {
+                e.preventDefault();
+            }
+        });
+        document.body.addEventListener('dragleave', () => {
+            if (dragDepth > 0) {
+                dragDepth--;
+                if (dragDepth === 0) {
+                    chatRoomEl.classList.remove('drag-over');
+                }
+            }
+        });
+        document.body.addEventListener('drop', async (e) => {
+            if (chatRoomEl.hidden || !hasFiles(e.dataTransfer)) {
+                clearDragOver();
+                return;
+            }
+            e.preventDefault();
+            clearDragOver();
+            const file = e.dataTransfer.files?.[0];
+            if (file) {
+                await uploadFile(file);
+            }
+        });
+
+        document.addEventListener('paste', async (e) => {
+            if (chatRoomEl.hidden) {
+                return;
+            }
+            const items = e.clipboardData?.items || [];
+            for (const item of items) {
+                if (item.kind === 'file') {
+                    const file = item.getAsFile();
+                    if (file) {
+                        e.preventDefault();
+                        await uploadFile(file);
+                        return;
+                    }
+                }
             }
         });
     };
