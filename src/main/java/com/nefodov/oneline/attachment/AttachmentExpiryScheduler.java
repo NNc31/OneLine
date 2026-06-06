@@ -14,10 +14,11 @@ public class AttachmentExpiryScheduler {
 
     @Scheduled(fixedDelay = 60_000L)
     public void sweep() {
-        int expired = cleanupService.sweepExpiredByChatTtl();
+        int expiredByChat = cleanupService.sweepExpiredByChatTtl();
         int unconfirmed = cleanupService.sweepUnconfirmed();
-        if (expired > 0 || unconfirmed > 0) {
-            log.info("Swept {} expired and {} unconfirmed attachment(s)", expired, unconfirmed);
+        int expiredByTtl = cleanupService.sweepExpiredByAttachmentTtl();
+        if (expiredByChat > 0 || unconfirmed > 0 || expiredByTtl > 0) {
+            log.info("Swept {} chat-TTL-expired, {} unconfirmed, {} attachment-TTL-expired attachment(s)", expiredByChat, unconfirmed, expiredByTtl);
         }
     }
 }

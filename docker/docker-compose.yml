@@ -74,6 +74,7 @@ services:
       MINIO_PUBLIC_ENDPOINT: http://localhost:9000
       MINIO_ACCESS_KEY: oneline
       MINIO_SECRET_KEY: oneline_secret
+      ONELINE_ATTACHMENTS_ENABLED: "${ONELINE_ATTACHMENTS_ENABLED:-true}"
     ports:
       - "8080:8080"
     logging: *default-logging

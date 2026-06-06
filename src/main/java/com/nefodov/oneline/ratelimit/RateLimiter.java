@@ -2,5 +2,9 @@ package com.nefodov.oneline.ratelimit;
 
 public interface RateLimiter {
 
-    boolean tryAcquire(String bucketName, String key);
+    default boolean tryAcquire(String bucketName, String key) {
+        return tryAcquire(bucketName, key, 1L);
+    }
+
+    boolean tryAcquire(String bucketName, String key, long tokens);
 }

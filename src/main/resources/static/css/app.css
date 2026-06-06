@@ -6,6 +6,7 @@
     --text: #e7e9ee;
     --muted: #8a90a2;
     --accent: #6aa6ff;
+    --accent-on: #0b0d12;
     --mine: #3a6ebf;
     --mine-text: #ffffff;
     --error: #c4453a;
@@ -28,6 +29,7 @@
         --text: #1a1c22;
         --muted: #6b7280;
         --accent: #3b82f6;
+        --accent-on: #ffffff;
         --mine: #3b82f6;
         --mine-text: #ffffff;
         --error: #c4453a;
@@ -45,6 +47,7 @@ html[data-theme="light"] {
     --text: #1a1c22;
     --muted: #6b7280;
     --accent: #3b82f6;
+    --accent-on: #ffffff;
     --mine: #3b82f6;
     --mine-text: #ffffff;
     --error: #c4453a;
@@ -61,6 +64,7 @@ html[data-theme="dark"] {
     --text: #e7e9ee;
     --muted: #8a90a2;
     --accent: #6aa6ff;
+    --accent-on: #0b0d12;
     --mine: #3a6ebf;
     --mine-text: #ffffff;
     --error: #c4453a;
@@ -135,7 +139,7 @@ html[data-theme="dark"] [data-theme-toggle] .i-dark { display: block; }
 
 button.primary, .primary {
     background: var(--accent);
-    color: #0b0d12;
+    color: var(--accent-on);
     border: 0;
     padding: 11px 20px;
     border-radius: var(--radius-sm);
@@ -529,6 +533,10 @@ body.chat-page {
     padding: 12px 24px;
     border-top: 1px solid var(--border);
     background: var(--surface);
+}
+
+.send:has(.attach[hidden]) {
+    grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .send input {

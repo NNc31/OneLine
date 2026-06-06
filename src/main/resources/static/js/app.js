@@ -91,10 +91,15 @@ const initChat = async (root) => {
     let loadingOlder = false;
     let noMoreHistory = false;
     let messageTtlMs = null;
+    let attachmentsEnabled = true;
     const HISTORY_PAGE = 50;
     const MAX_TIMEOUT_MS = 2147483647;
-    const FILE_MARKER = 'file/v1';
-    const MAX_FILE_BYTES = 100 * 1024 * 1024;
+    const FILE_MARKER_V1 = 'file/v1';
+    const FILE_MARKER_V2 = 'file/v2';
+    const MAX_FILE_BYTES = 1024 * 1024 * 1024;
+    const CHUNK_PLAIN_BYTES = 4 * 1024 * 1024;
+    const CHUNK_OVERHEAD_BYTES = 1 + 12 + 16;
+    const UPLOAD_CONCURRENCY = 4;
 
     const humanizeTtl = (sec) => {
         if (sec % 86400 === 0) {
@@ -116,10 +121,19 @@ const initChat = async (root) => {
         }
     };
 
+    const applyAttachmentsAvailability = () => {
+        if (attachBtnEl) {
+            attachBtnEl.hidden = !attachmentsEnabled;
+        }
+    };
+
     const parseFilePayload = (text) => {
         try {
             const obj = JSON.parse(text);
-            return obj?.k === FILE_MARKER ? obj : null;
+            if (obj?.k === FILE_MARKER_V1 || obj?.k === FILE_MARKER_V2) {
+                return obj;
+            }
+            return null;
         } catch {
             return null;
         }
@@ -186,6 +200,14 @@ const initChat = async (root) => {
         return { xhr, promise };
     };
 
+    const fetchChunk = async (url) => {
+        const resp = await fetch(url);
+        if (!resp.ok) {
+            throw new Error(`attachment fetch ${resp.status}`);
+        }
+        return new Uint8Array(await resp.arrayBuffer());
+    };
+
     const downloadAndDecrypt = async (payload) => {
         const resp = await fetch(`/api/chats/${publicId}/attachments/${payload.id}`, {
             method: 'GET',
@@ -195,14 +217,33 @@ const initChat = async (root) => {
         if (!resp.ok) {
             throw new Error(`attachment url ${resp.status}`);
         }
-        const { downloadUrl } = await resp.json();
-        const blobResp = await fetch(downloadUrl);
-        if (!blobResp.ok) {
-            throw new Error(`attachment fetch ${blobResp.status}`);
+        const { chunks } = await resp.json();
+        if (!Array.isArray(chunks) || chunks.length === 0) {
+            throw new Error('attachment chunks missing');
         }
-        const ciphertext = new Uint8Array(await blobResp.arrayBuffer());
+        const ordered = chunks.slice().sort((a, b) => a.index - b.index);
         const fileKey = await OneLineCrypto.importRawKey(OneLineCrypto.base64Decode(payload.key));
-        return OneLineCrypto.decryptBytes(fileKey, ciphertext);
+
+        if (payload.k === FILE_MARKER_V1) {
+            const cipher = await fetchChunk(ordered[0].downloadUrl);
+            return OneLineCrypto.decryptBytes(fileKey, cipher);
+        }
+
+        const parts = new Array(ordered.length);
+        let total = 0;
+        for (let i = 0; i < ordered.length; i++) {
+            const cipher = await fetchChunk(ordered[i].downloadUrl);
+            const plain = await OneLineCrypto.decryptBytes(fileKey, cipher);
+            parts[i] = plain;
+            total += plain.byteLength;
+        }
+        const assembled = new Uint8Array(total);
+        let offset = 0;
+        for (const p of parts) {
+            assembled.set(p, offset);
+            offset += p.byteLength;
+        }
+        return assembled;
     };
 
     const renderFileBody = (li, body, payload) => {
@@ -676,34 +717,104 @@ const initChat = async (root) => {
             if (!client.connected || !cryptoKey) {
                 return;
             }
+            if (!attachmentsEnabled) {
+                setStatus('error', 'Attachments are temporarily disabled');
+                return;
+            }
             if (file.size > MAX_FILE_BYTES) {
                 setStatus('error', `File too large (max ${humanizeSize(MAX_FILE_BYTES)})`);
                 return;
             }
+            const chunkCount = Math.max(1, Math.ceil(file.size / CHUNK_PLAIN_BYTES));
+            const cipherSizes = [];
+            for (let i = 0; i < chunkCount; i++) {
+                const plainSize = Math.min(CHUNK_PLAIN_BYTES, file.size - i * CHUNK_PLAIN_BYTES);
+                cipherSizes.push(plainSize + CHUNK_OVERHEAD_BYTES);
+            }
+
             attachBtnEl.disabled = true;
-            showProgress(`Encrypting ${file.name}...`);
+            showProgress(`Preparing ${file.name}...`);
+            const activeXhrs = new Set();
+            let cancelled = false;
+            const cancelAll = () => {
+                cancelled = true;
+                for (const xhr of activeXhrs) {
+                    xhr.abort();
+                }
+            };
+            activeUpload = { abort: cancelAll };
+
             try {
                 const fileKeyRaw = OneLineCrypto.randomRawKey();
                 const fileKey = await OneLineCrypto.importRawKey(fileKeyRaw);
-                const ciphertext = await OneLineCrypto.encryptBytes(fileKey, new Uint8Array(await file.arrayBuffer()));
 
                 const prepResp = await fetch(`/api/chats/${publicId}/attachments`, {
                     method: 'POST',
                     headers: apiHeaders({ 'Content-Type': 'application/json' }),
                     credentials: 'same-origin',
-                    body: JSON.stringify({ size: ciphertext.length }),
+                    body: JSON.stringify({ chunks: cipherSizes }),
                 });
                 if (!prepResp.ok) {
-                    throw new Error('prepare ' + prepResp.status);
+                    let reason = `prepare ${prepResp.status}`;
+                    try {
+                        const parsed = await prepResp.json();
+                        if (parsed?.error) {
+                            reason = parsed.error;
+                        }
+                    } catch {
+                    }
+                    throw new Error(reason);
                 }
-                const { attachmentId, uploadUrl } = await prepResp.json();
+                const { attachmentId, chunks: chunkUploads } = await prepResp.json();
+                const uploadsByIndex = new Map(chunkUploads.map(c => [c.index, c.uploadUrl]));
 
-                const putHandle = xhrPut(uploadUrl, ciphertext, (r) => setProgress(r, file.name));
-                activeUpload = putHandle.xhr;
-                try {
-                    await putHandle.promise;
-                } finally {
-                    activeUpload = null;
+                let uploadedBytes = 0;
+                const totalPlainBytes = file.size || 1;
+                const uploadOne = async (i) => {
+                    if (cancelled) {
+                        return;
+                    }
+                    const start = i * CHUNK_PLAIN_BYTES;
+                    const end = Math.min(file.size, start + CHUNK_PLAIN_BYTES);
+                    const slice = await file.slice(start, end).arrayBuffer();
+                    const cipher = await OneLineCrypto.encryptBytes(fileKey, new Uint8Array(slice));
+                    if (cancelled) {
+                        return;
+                    }
+                    const uploadUrl = uploadsByIndex.get(i);
+                    if (!uploadUrl) {
+                        throw new Error(`missing upload url for chunk ${i}`);
+                    }
+                    const putHandle = xhrPut(uploadUrl, cipher, null);
+                    activeXhrs.add(putHandle.xhr);
+                    try {
+                        await putHandle.promise;
+                    } finally {
+                        activeXhrs.delete(putHandle.xhr);
+                    }
+                    uploadedBytes += (end - start);
+                    setProgress(uploadedBytes / totalPlainBytes, file.name);
+                };
+
+                const queue = [];
+                for (let i = 0; i < chunkCount; i++) {
+                    queue.push(i);
+                }
+                const worker = async () => {
+                    while (queue.length > 0 && !cancelled) {
+                        const i = queue.shift();
+                        await uploadOne(i);
+                    }
+                };
+                const workers = [];
+                for (let i = 0; i < Math.min(UPLOAD_CONCURRENCY, chunkCount); i++) {
+                    workers.push(worker());
+                }
+                await Promise.all(workers);
+                if (cancelled) {
+                    const err = new Error('upload cancelled');
+                    err.aborted = true;
+                    throw err;
                 }
 
                 uploadProgressLabelEl.textContent = `Finalizing ${file.name}...`;
@@ -717,12 +828,13 @@ const initChat = async (root) => {
                 }
 
                 const payload = JSON.stringify({
-                    k: FILE_MARKER,
+                    k: FILE_MARKER_V2,
                     id: attachmentId,
                     name: file.name,
                     mime: file.type || 'application/octet-stream',
                     size: file.size,
                     key: OneLineCrypto.base64Encode(fileKeyRaw),
+                    chunkCount,
                 });
                 const content = await OneLineCrypto.encrypt(cryptoKey, payload);
                 const messageId = crypto.randomUUID();
@@ -819,6 +931,8 @@ const initChat = async (root) => {
         .then(meta => {
             chatId = meta.chatId;
             applyTtl(meta.messageTtlSeconds);
+            attachmentsEnabled = meta.attachmentsEnabled !== false;
+            applyAttachmentsAvailability();
             if (meta.me) {
                 return loadHistoryAndConnect(meta.me);
             }

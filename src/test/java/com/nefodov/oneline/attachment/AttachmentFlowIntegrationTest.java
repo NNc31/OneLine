@@ -20,6 +20,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -55,14 +56,15 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
     private final HttpClient http = HttpClient.newHttpClient();
 
     @Test
-    @DisplayName("Prepare with presigned PUT and confirm -> presigned GET round-trips ciphertext")
+    @DisplayName("Single-chunk prepare/confirm/download round-trips ciphertext")
     void uploadAndDownloadRoundTrip() throws Exception {
         Joined chat = createAndJoin();
         byte[] blob = randomBytes(4096);
 
-        Map<String, Object> prepared = prepareUpload(chat, blob.length);
+        Map<String, Object> prepared = prepareUpload(chat, List.of(blob.length));
         long attachmentId = ((Number) prepared.get("attachmentId")).longValue();
-        String uploadUrl = (String) prepared.get("uploadUrl");
+        List<Map<String, Object>> chunkUploads = chunksOf(prepared);
+        String uploadUrl = (String) chunkUploads.get(0).get("uploadUrl");
 
         HttpResponse<Void> put = http.send(
                 HttpRequest.newBuilder(URI.create(uploadUrl)).PUT(HttpRequest.BodyPublishers.ofByteArray(blob)).build(),
@@ -82,7 +84,9 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
                 new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, download.getStatusCode());
-        String downloadUrl = (String) download.getBody().get("downloadUrl");
+        List<Map<String, Object>> downloadChunks = chunksOf(download.getBody());
+        assertEquals(1, downloadChunks.size());
+        String downloadUrl = (String) downloadChunks.get(0).get("downloadUrl");
 
         HttpResponse<byte[]> fetched = http.send(
                 HttpRequest.newBuilder(URI.create(downloadUrl)).GET().build(),
@@ -92,12 +96,60 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    @DisplayName("Multi-chunk prepare, confirm and download preserves order and bytes")
+    void multiChunkRoundTrip() throws Exception {
+        Joined chat = createAndJoin();
+        byte[] c0 = randomBytes(2048);
+        byte[] c1 = randomBytes(3000);
+        byte[] c2 = randomBytes(1024);
+
+        Map<String, Object> prepared = prepareUpload(chat, List.of(c0.length, c1.length, c2.length));
+        long attachmentId = ((Number) prepared.get("attachmentId")).longValue();
+        List<Map<String, Object>> chunkUploads = chunksOf(prepared);
+        assertEquals(3, chunkUploads.size());
+
+        byte[][] payloads = {c0, c1, c2};
+        for (Map<String, Object> chunkUpload : chunkUploads) {
+            int idx = ((Number) chunkUpload.get("index")).intValue();
+            String url = (String) chunkUpload.get("uploadUrl");
+            HttpResponse<Void> put = http.send(
+                    HttpRequest.newBuilder(URI.create(url)).PUT(HttpRequest.BodyPublishers.ofByteArray(payloads[idx])).build(),
+                    HttpResponse.BodyHandlers.discarding());
+            assertEquals(200, put.statusCode());
+        }
+
+        ResponseEntity<String> confirm = restTemplate.exchange(
+                "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId + "/confirm",
+                HttpMethod.POST,
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                String.class);
+        assertEquals(HttpStatus.OK, confirm.getStatusCode());
+
+        ResponseEntity<Map<String, Object>> download = restTemplate.exchange(
+                "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId,
+                HttpMethod.GET,
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                JSON_OBJECT);
+        assertEquals(HttpStatus.OK, download.getStatusCode());
+        List<Map<String, Object>> downloadChunks = chunksOf(download.getBody());
+        assertEquals(3, downloadChunks.size());
+
+        for (Map<String, Object> chunk : downloadChunks) {
+            int idx = ((Number) chunk.get("index")).intValue();
+            String url = (String) chunk.get("downloadUrl");
+            HttpResponse<byte[]> fetched = http.send(HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+            assertEquals(200, fetched.statusCode());
+            assertArrayEquals(payloads[idx], fetched.body(), "chunk " + idx);
+        }
+    }
+
+    @Test
     @DisplayName("An attachment cannot be downloaded through a different chat session")
     void attachmentIsScopedToItsChat() {
         Joined chatA = createAndJoin();
         Joined chatB = createAndJoin();
 
-        Map<String, Object> prepared = prepareUpload(chatA, 128);
+        Map<String, Object> prepared = prepareUpload(chatA, List.of(128L));
         long attachmentId = ((Number) prepared.get("attachmentId")).longValue();
 
         ResponseEntity<String> resp = restTemplate.exchange(
@@ -112,7 +164,7 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
     @DisplayName("Confirming before any upload returns 404")
     void confirmWithoutUploadReturns404() {
         Joined chat = createAndJoin();
-        Map<String, Object> prepared = prepareUpload(chat, 256);
+        Map<String, Object> prepared = prepareUpload(chat, List.of(256L));
         long attachmentId = ((Number) prepared.get("attachmentId")).longValue();
 
         ResponseEntity<String> resp = restTemplate.exchange(
@@ -123,15 +175,27 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
         assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
     }
 
-    private Map<String, Object> prepareUpload(Joined chat, int size) {
+    private Map<String, Object> prepareUpload(Joined chat, List<? extends Number> chunkSizes) {
+        StringBuilder body = new StringBuilder("{\"chunks\":[");
+        for (int i = 0; i < chunkSizes.size(); i++) {
+            if (i > 0) {
+                body.append(",");
+            }
+            body.append(chunkSizes.get(i).longValue());
+        }
+        body.append("]}");
         ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments",
                 HttpMethod.POST,
-                new HttpEntity<>("{\"size\":" + size + "}", jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                new HttpEntity<>(body.toString(), jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, resp.getStatusCode());
         assertNotNull(resp.getBody());
         return resp.getBody();
+    }
+
+    private static List<Map<String, Object>> chunksOf(Map<String, Object> body) {
+        return (List<Map<String, Object>>) body.get("chunks");
     }
 
     private Joined createAndJoin() {

@@ -1,6 +1,7 @@
 package com.nefodov.oneline.chat;
 
 import com.nefodov.oneline.chat.dto.*;
+import com.nefodov.oneline.config.OneLineProperties;
 import com.nefodov.oneline.message.Message;
 import com.nefodov.oneline.message.MessageService;
 import com.nefodov.oneline.message.dto.MessageResponse;
@@ -37,6 +38,7 @@ public class ChatApiController {
     private final RateLimiter rateLimiter;
     private final PresenceService presenceService;
     private final MeterRegistry meterRegistry;
+    private final OneLineProperties properties;
 
     @GetMapping("/{publicId}")
     public ChatMetaResponse meta(@PathVariable("publicId") UUID publicId,
@@ -44,7 +46,7 @@ public class ChatApiController {
                                  @AuthenticationPrincipal ChatSession session) {
         Chat chat = resolveChat(publicId, chatToken);
         ParticipantView me = session == null ? null : new ParticipantView(session.participant().getId(), session.participant().getDisplayName());
-        return new ChatMetaResponse(chat.getId(), participantService.countParticipants(chat), me, chat.getMessageTtlSeconds());
+        return new ChatMetaResponse(chat.getId(), participantService.countParticipants(chat), me, chat.getMessageTtlSeconds(), properties.attachments().enabled());
     }
 
     @PostMapping("/{publicId}/join")

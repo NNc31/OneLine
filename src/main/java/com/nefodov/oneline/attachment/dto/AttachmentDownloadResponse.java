@@ -1,4 +1,9 @@
 package com.nefodov.oneline.attachment.dto;
 
-public record AttachmentDownloadResponse(String downloadUrl) {
+import java.util.List;
+
+public record AttachmentDownloadResponse(List<ChunkDownload> chunks) {
+
+    public record ChunkDownload(int index, String downloadUrl) {
+    }
 }

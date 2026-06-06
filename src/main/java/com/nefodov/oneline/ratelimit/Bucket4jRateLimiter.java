@@ -25,12 +25,12 @@ public class Bucket4jRateLimiter implements RateLimiter {
     }
 
     @Override
-    public boolean tryAcquire(String bucketName, String key) {
+    public boolean tryAcquire(String bucketName, String key, long tokens) {
         OneLineProperties.RateLimit.Bucket config = configFor(bucketName);
         byte[] redisKey = ("oneline:rl:" + bucketName + ":" + key).getBytes(StandardCharsets.UTF_8);
         try {
             BucketProxy bucket = proxyManager.builder().build(redisKey, configurationSupplier(config));
-            return bucket.tryConsume(1);
+            return bucket.tryConsume(tokens);
         } catch (RuntimeException e) {
             log.warn("Rate limiter unavailable for bucket '{}', allowing request: {}", bucketName, e.getMessage());
             return true;
@@ -56,6 +56,7 @@ public class Bucket4jRateLimiter implements RateLimiter {
             case "join" -> limits.join();
             case "message" -> limits.message();
             case "attachment" -> limits.attachment();
+            case "upload-bytes" -> limits.uploadBytes();
             default -> throw new IllegalArgumentException("Unknown rate-limit bucket: " + bucketName);
         };
     }

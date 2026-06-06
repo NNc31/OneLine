@@ -23,6 +23,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -73,12 +74,12 @@ class AttachmentCleanupServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("Removes both the row and the MinIO object")
-    void sweepExpiredRemovesObjectAndRow() throws Exception {
+    @DisplayName("Removes the legacy v1 row and its MinIO object")
+    void sweepExpiredRemovesLegacyObjectAndRow() throws Exception {
         Chat chat = persistChat(60L);
         ChatParticipant member = persistParticipant(chat);
         String objectKey = putObject();
-        Attachment attachment = persistAttachment(chat, member, objectKey, true, FAR_PAST);
+        Attachment attachment = persistLegacyAttachment(chat, member, objectKey, true, FAR_PAST);
         int swept = cleanupService.sweepExpiredByChatTtl();
         assertThat(swept).isGreaterThanOrEqualTo(1);
         em.clear();
@@ -88,13 +89,47 @@ class AttachmentCleanupServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("Removes abandoned uploads and their objects")
-    void sweepUnconfirmedRemovesAbandoned() throws Exception {
+    @DisplayName("Removes every chunk object and the parent row")
+    void sweepExpiredRemovesAllChunksAndRow() throws Exception {
+        Chat chat = persistChat(60L);
+        ChatParticipant member = persistParticipant(chat);
+        List<String> objectKeys = List.of(putObject(), putObject(), putObject());
+        Attachment attachment = persistChunkedAttachment(chat, member, objectKeys, true, FAR_PAST);
+        int swept = cleanupService.sweepExpiredByChatTtl();
+        assertThat(swept).isGreaterThanOrEqualTo(1);
+        em.clear();
+        assertThat(attachmentRepository.findById(attachment.getId())).isEmpty();
+        for (String key : objectKeys) {
+            assertThat(storage.objectSize(key)).as("chunk %s should be deleted", key).isEmpty();
+        }
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Removes abandoned uploads and their chunk objects")
+    void sweepUnconfirmedRemovesAbandonedChunks() throws Exception {
+        Chat chat = persistChat(null);
+        ChatParticipant member = persistParticipant(chat);
+        List<String> objectKeys = List.of(putObject(), putObject());
+        Attachment attachment = persistChunkedAttachment(chat, member, objectKeys, false, FAR_PAST);
+        int swept = cleanupService.sweepUnconfirmed();
+        assertThat(swept).isGreaterThanOrEqualTo(1);
+        em.clear();
+        assertThat(attachmentRepository.findById(attachment.getId())).isEmpty();
+        for (String key : objectKeys) {
+            assertThat(storage.objectSize(key)).isEmpty();
+        }
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("Removes attachments older than the configured TTL")
+    void sweepExpiredByAttachmentTtlRemovesOldRow() throws Exception {
         Chat chat = persistChat(null);
         ChatParticipant member = persistParticipant(chat);
         String objectKey = putObject();
-        Attachment attachment = persistAttachment(chat, member, objectKey, false, FAR_PAST);
-        int swept = cleanupService.sweepUnconfirmed();
+        Attachment attachment = persistLegacyAttachment(chat, member, objectKey, true, FAR_PAST);
+        int swept = cleanupService.sweepExpiredByAttachmentTtl();
         assertThat(swept).isGreaterThanOrEqualTo(1);
         em.clear();
         assertThat(attachmentRepository.findById(attachment.getId())).isEmpty();
@@ -132,7 +167,7 @@ class AttachmentCleanupServiceTest {
         return participant;
     }
 
-    private Attachment persistAttachment(Chat chat, ChatParticipant participant, String objectKey, boolean confirmed, Instant createdAt) {
+    private Attachment persistLegacyAttachment(Chat chat, ChatParticipant participant, String objectKey, boolean confirmed, Instant createdAt) {
         Attachment attachment = new Attachment();
         attachment.setChat(chat);
         attachment.setParticipant(participant);
@@ -140,6 +175,26 @@ class AttachmentCleanupServiceTest {
         attachment.setCiphertextSize(4);
         attachment.setConfirmed(confirmed);
         attachment.setCreatedAt(createdAt);
+        em.persist(attachment);
+        em.flush();
+        return attachment;
+    }
+
+    private Attachment persistChunkedAttachment(Chat chat, ChatParticipant participant, List<String> objectKeys, boolean confirmed, Instant createdAt) {
+        Attachment attachment = new Attachment();
+        attachment.setChat(chat);
+        attachment.setParticipant(participant);
+        attachment.setObjectKey(null);
+        attachment.setCiphertextSize(4L * objectKeys.size());
+        attachment.setConfirmed(confirmed);
+        attachment.setCreatedAt(createdAt);
+        for (int i = 0; i < objectKeys.size(); i++) {
+            AttachmentChunk chunk = new AttachmentChunk();
+            chunk.setChunkIndex(i);
+            chunk.setObjectKey(objectKeys.get(i));
+            chunk.setCiphertextSize(4);
+            attachment.addChunk(chunk);
+        }
         em.persist(attachment);
         em.flush();
         return attachment;

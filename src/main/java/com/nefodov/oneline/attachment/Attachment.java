@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "attachments")
@@ -28,7 +30,7 @@ public class Attachment {
     @JoinColumn(name = "participant_id", nullable = false)
     private ChatParticipant participant;
 
-    @Column(name = "object_key", nullable = false, unique = true, updatable = false)
+    @Column(name = "object_key", unique = true, updatable = false)
     private String objectKey;
 
     @Column(name = "ciphertext_size", nullable = false)
@@ -40,10 +42,19 @@ public class Attachment {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @OneToMany(mappedBy = "attachment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("chunkIndex ASC")
+    private List<AttachmentChunk> chunks = new ArrayList<>();
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
             createdAt = Instant.now();
         }
+    }
+
+    public void addChunk(AttachmentChunk chunk) {
+        chunk.setAttachment(this);
+        chunks.add(chunk);
     }
 }

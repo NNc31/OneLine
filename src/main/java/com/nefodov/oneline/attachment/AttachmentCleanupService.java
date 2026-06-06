@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
@@ -18,28 +19,43 @@ public class AttachmentCleanupService {
     private final Clock clock;
 
     public int sweepExpiredByChatTtl() {
-        return removeInFull(repository.findExpiredObjectKeysByChatTtl());
+        return removeFull(repository.findExpiredAttachmentIdsByChatTtl());
     }
 
     public int sweepUnconfirmed() {
         Instant cutoff = clock.instant().minus(properties.storage().unconfirmedTtl());
-        return removeInFull(repository.findUnconfirmedObjectKeysOlderThan(cutoff));
+        return removeFull(repository.findUnconfirmedAttachmentIdsOlderThan(cutoff));
+    }
+
+    public int sweepExpiredByAttachmentTtl() {
+        Duration ttl = properties.attachments().ttl();
+        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+            return 0;
+        }
+        Instant cutoff = clock.instant().minus(ttl);
+        return removeFull(repository.findAttachmentIdsOlderThan(cutoff));
     }
 
     public int removeObjectsForInactiveChats(Instant cutoff) {
-        List<String> keys = repository.findObjectKeysForInactiveChatsBefore(cutoff);
-        if (keys.isEmpty()) {
+        List<Long> ids = repository.findAttachmentIdsForInactiveChatsBefore(cutoff);
+        if (ids.isEmpty()) {
             return 0;
         }
-        storage.remove(keys);
-        return keys.size();
+        List<String> keys = repository.findAllObjectKeysByAttachmentIds(ids);
+        if (!keys.isEmpty()) {
+            storage.remove(keys);
+        }
+        return ids.size();
     }
 
-    private int removeInFull(List<String> objectKeys) {
-        if (objectKeys.isEmpty()) {
+    private int removeFull(List<Long> attachmentIds) {
+        if (attachmentIds.isEmpty()) {
             return 0;
         }
-        storage.remove(objectKeys);
-        return repository.deleteByObjectKeys(objectKeys);
+        List<String> keys = repository.findAllObjectKeysByAttachmentIds(attachmentIds);
+        if (!keys.isEmpty()) {
+            storage.remove(keys);
+        }
+        return repository.deleteByIds(attachmentIds);
     }
 }
