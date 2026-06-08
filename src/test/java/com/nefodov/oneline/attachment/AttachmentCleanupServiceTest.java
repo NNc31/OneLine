@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Testcontainers
@@ -81,10 +81,10 @@ class AttachmentCleanupServiceTest {
         String objectKey = putObject();
         Attachment attachment = persistLegacyAttachment(chat, member, objectKey, true, FAR_PAST);
         int swept = cleanupService.sweepExpiredByChatTtl();
-        assertThat(swept).isGreaterThanOrEqualTo(1);
+        assertTrue(swept >= 1);
         em.clear();
-        assertThat(attachmentRepository.findById(attachment.getId())).isEmpty();
-        assertThat(storage.objectSize(objectKey)).isEmpty();
+        assertTrue(attachmentRepository.findById(attachment.getId()).isEmpty());
+        assertTrue(storage.objectSize(objectKey).isEmpty());
     }
 
     @Test
@@ -96,11 +96,11 @@ class AttachmentCleanupServiceTest {
         List<String> objectKeys = List.of(putObject(), putObject(), putObject());
         Attachment attachment = persistChunkedAttachment(chat, member, objectKeys, true, FAR_PAST);
         int swept = cleanupService.sweepExpiredByChatTtl();
-        assertThat(swept).isGreaterThanOrEqualTo(1);
+        assertTrue(swept >= 1);
         em.clear();
-        assertThat(attachmentRepository.findById(attachment.getId())).isEmpty();
+        assertTrue(attachmentRepository.findById(attachment.getId()).isEmpty());
         for (String key : objectKeys) {
-            assertThat(storage.objectSize(key)).as("chunk %s should be deleted", key).isEmpty();
+            assertTrue(storage.objectSize(key).isEmpty(), () -> "chunk " + key + " should be deleted");
         }
     }
 
@@ -113,11 +113,11 @@ class AttachmentCleanupServiceTest {
         List<String> objectKeys = List.of(putObject(), putObject());
         Attachment attachment = persistChunkedAttachment(chat, member, objectKeys, false, FAR_PAST);
         int swept = cleanupService.sweepUnconfirmed();
-        assertThat(swept).isGreaterThanOrEqualTo(1);
+        assertTrue(swept >= 1);
         em.clear();
-        assertThat(attachmentRepository.findById(attachment.getId())).isEmpty();
+        assertTrue(attachmentRepository.findById(attachment.getId()).isEmpty());
         for (String key : objectKeys) {
-            assertThat(storage.objectSize(key)).isEmpty();
+            assertTrue(storage.objectSize(key).isEmpty());
         }
     }
 
@@ -130,10 +130,10 @@ class AttachmentCleanupServiceTest {
         String objectKey = putObject();
         Attachment attachment = persistLegacyAttachment(chat, member, objectKey, true, FAR_PAST);
         int swept = cleanupService.sweepExpiredByAttachmentTtl();
-        assertThat(swept).isGreaterThanOrEqualTo(1);
+        assertTrue(swept >= 1);
         em.clear();
-        assertThat(attachmentRepository.findById(attachment.getId())).isEmpty();
-        assertThat(storage.objectSize(objectKey)).isEmpty();
+        assertTrue(attachmentRepository.findById(attachment.getId()).isEmpty());
+        assertTrue(storage.objectSize(objectKey).isEmpty());
     }
 
     private String putObject() throws Exception {

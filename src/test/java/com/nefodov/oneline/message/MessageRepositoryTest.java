@@ -19,7 +19,8 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Testcontainers
@@ -51,10 +52,10 @@ class MessageRepositoryTest {
         Message stale = persistMessage(chat, member, FAR_PAST);
         Message fresh = persistMessage(chat, member, FAR_FUTURE);
         int deleted = messageRepository.deleteExpiredByChatTtl();
-        assertThat(deleted).isEqualTo(1);
+        assertEquals(1, deleted);
         em.clear();
-        assertThat(messageRepository.findById(stale.getId())).isEmpty();
-        assertThat(messageRepository.findById(fresh.getId())).isPresent();
+        assertTrue(messageRepository.findById(stale.getId()).isEmpty());
+        assertTrue(messageRepository.findById(fresh.getId()).isPresent());
     }
 
     @Test
@@ -64,9 +65,9 @@ class MessageRepositoryTest {
         ChatParticipant member = persistParticipant(chat);
         Message ancient = persistMessage(chat, member, FAR_PAST);
         int deleted = messageRepository.deleteExpiredByChatTtl();
-        assertThat(deleted).isZero();
+        assertEquals(0, deleted);
         em.clear();
-        assertThat(messageRepository.findById(ancient.getId())).isPresent();
+        assertTrue(messageRepository.findById(ancient.getId()).isPresent());
     }
 
     private Chat persistChat(Long ttlSeconds) {

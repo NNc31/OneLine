@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" th:content="${_csrf != null ? _csrf.token : ''}">
+    <meta name="csrf-header" th:content="${_csrf != null ? _csrf.headerName : 'X-XSRF-TOKEN'}">
     <title>OneLine</title>
     <link rel="icon" th:href="@{/favicon.svg}" type="image/svg+xml">
     <link rel="stylesheet" th:href="@{/css/app.css}">

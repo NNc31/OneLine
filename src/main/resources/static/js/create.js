@@ -7,10 +7,9 @@
         return;
     }
 
-    const readCookie = (name) => {
-        const match = document.cookie.split('; ').find(r => r.startsWith(name + '='));
-        return match ? decodeURIComponent(match.slice(name.length + 1)) : '';
-    };
+    const readMeta = (name) => document.querySelector(`meta[name="${name}"]`)?.content || '';
+    const csrfHeader = readMeta('csrf-header') || 'X-XSRF-TOKEN';
+    const csrfToken = readMeta('csrf-token');
 
     const readTtlSeconds = () => {
         const n = Number.parseInt(ttlValueEl?.value, 10);
@@ -32,7 +31,7 @@
             const payload = messageTtlSeconds ? { authToken, messageTtlSeconds } : { authToken };
             const resp = await fetch('/api/chats', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-XSRF-TOKEN': readCookie('XSRF-TOKEN'),},
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json', [csrfHeader]: csrfToken},
                 credentials: 'same-origin',
                 body: JSON.stringify(payload),
             });

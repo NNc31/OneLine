@@ -1,7 +1,6 @@
 package com.nefodov.oneline.chat;
 
 import com.nefodov.oneline.chat.dto.ParticipantView;
-import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,9 +19,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Testcontainers
@@ -67,7 +68,10 @@ class PresenceServiceTest {
     void onlineListsMarkedParticipant() {
         long chatId = 1001L;
         presence.markOnline(chatId, 7L, "Alice");
-        assertThat(presence.online(chatId)).extracting(ParticipantView::id, ParticipantView::displayName).containsExactly(Tuple.tuple(7L, "Alice"));
+        List<ParticipantView> online = presence.online(chatId);
+        assertEquals(1, online.size());
+        assertEquals(7L, online.get(0).id());
+        assertEquals("Alice", online.get(0).displayName());
     }
 
     @Test
@@ -77,8 +81,8 @@ class PresenceServiceTest {
         presence.markOnline(chatId, 7L, "Alice");
         NOW.set(T0 + STALE_MS + 1_000L);
         int evicted = presence.evictStale(chatId);
-        assertThat(evicted).isEqualTo(1);
-        assertThat(presence.online(chatId)).isEmpty();
+        assertEquals(1, evicted);
+        assertTrue(presence.online(chatId).isEmpty());
     }
 
     @Test
@@ -90,8 +94,10 @@ class PresenceServiceTest {
         presence.markOnline(chatId, 2L, "Fresh");
         NOW.set(T0 + STALE_MS + 1_000L);
         int evicted = presence.evictStale(chatId);
-        assertThat(evicted).isEqualTo(1);
-        assertThat(presence.online(chatId)).extracting(ParticipantView::displayName).containsExactly("Fresh");
+        assertEquals(1, evicted);
+        List<ParticipantView> online = presence.online(chatId);
+        assertEquals(1, online.size());
+        assertEquals("Fresh", online.getFirst().displayName());
     }
 
     @Test
@@ -101,6 +107,8 @@ class PresenceServiceTest {
         presence.markOnline(chatId, 7L, "Alice");
         presence.markOnline(chatId, 8L, "Bob");
         presence.markOffline(chatId, 7L);
-        assertThat(presence.online(chatId)).extracting(ParticipantView::displayName).containsExactly("Bob");
+        List<ParticipantView> online = presence.online(chatId);
+        assertEquals(1, online.size());
+        assertEquals("Bob", online.getFirst().displayName());
     }
 }

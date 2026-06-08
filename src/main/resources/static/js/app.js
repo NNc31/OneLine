@@ -45,15 +45,14 @@ const initChat = async (root) => {
         return;
     }
 
-    const readCookie = (name) => {
-        const match = document.cookie.split('; ').find(r => r.startsWith(name + '='));
-        return match ? decodeURIComponent(match.slice(name.length + 1)) : '';
-    };
+    const readMeta = (name) => document.querySelector(`meta[name="${name}"]`)?.content || '';
+    const csrfHeader = readMeta('csrf-header') || 'X-XSRF-TOKEN';
+    const csrfToken = readMeta('csrf-token');
 
     const apiHeaders = (extra) => ({
         'X-Chat-Token': authToken,
         'Accept': 'application/json',
-        'X-XSRF-TOKEN': readCookie('XSRF-TOKEN'),
+        [csrfHeader]: csrfToken,
         ...extra,
     });
 
@@ -713,6 +712,72 @@ const initChat = async (root) => {
             });
         }
 
+        const computeCipherSizes = (file, chunkCount) => {
+            const sizes = [];
+            for (let i = 0; i < chunkCount; i++) {
+                const plainSize = Math.min(CHUNK_PLAIN_BYTES, file.size - i * CHUNK_PLAIN_BYTES);
+                sizes.push(plainSize + CHUNK_OVERHEAD_BYTES);
+            }
+            return sizes;
+        };
+
+        const requestUploadSlots = async (cipherSizes) => {
+            const resp = await fetch(`/api/chats/${publicId}/attachments`, {
+                method: 'POST',
+                headers: apiHeaders({ 'Content-Type': 'application/json' }),
+                credentials: 'same-origin',
+                body: JSON.stringify({ chunks: cipherSizes }),
+            });
+            if (resp.ok) {
+                return resp.json();
+            }
+            let reason = `prepare ${resp.status}`;
+            try {
+                const parsed = await resp.json();
+                if (parsed?.error) {
+                    reason = parsed.error;
+                }
+            } catch {
+                // body wasn't JSON
+            }
+            throw new Error(reason);
+        };
+
+        const runUploadPool = async (chunkCount, uploadOne) => {
+            const queue = [];
+            for (let i = 0; i < chunkCount; i++) {
+                queue.push(i);
+            }
+            const worker = async () => {
+                while (queue.length > 0) {
+                    const i = queue.shift();
+                    await uploadOne(i);
+                }
+            };
+            const workers = [];
+            for (let i = 0; i < Math.min(UPLOAD_CONCURRENCY, chunkCount); i++) {
+                workers.push(worker());
+            }
+            await Promise.all(workers);
+        };
+
+        const publishAttachmentMessage = async (attachmentId, file, fileKeyRaw, chunkCount) => {
+            const payload = JSON.stringify({
+                k: FILE_MARKER_V2,
+                id: attachmentId,
+                name: file.name,
+                mime: file.type || 'application/octet-stream',
+                size: file.size,
+                key: OneLineCrypto.base64Encode(fileKeyRaw),
+                chunkCount,
+            });
+            const content = await OneLineCrypto.encrypt(cryptoKey, payload);
+            client.publish({
+                destination: `/app/chat.${chatId}.send`,
+                body: JSON.stringify({ clientMessageId: crypto.randomUUID(), content }),
+            });
+        };
+
         const uploadFile = async (file) => {
             if (!client.connected || !cryptoKey) {
                 return;
@@ -725,19 +790,16 @@ const initChat = async (root) => {
                 setStatus('error', `File too large (max ${humanizeSize(MAX_FILE_BYTES)})`);
                 return;
             }
+
             const chunkCount = Math.max(1, Math.ceil(file.size / CHUNK_PLAIN_BYTES));
-            const cipherSizes = [];
-            for (let i = 0; i < chunkCount; i++) {
-                const plainSize = Math.min(CHUNK_PLAIN_BYTES, file.size - i * CHUNK_PLAIN_BYTES);
-                cipherSizes.push(plainSize + CHUNK_OVERHEAD_BYTES);
-            }
+            const cipherSizes = computeCipherSizes(file, chunkCount);
 
             attachBtnEl.disabled = true;
             showProgress(`Preparing ${file.name}...`);
             const activeXhrs = new Set();
-            let cancelled = false;
+            const cancellation = { cancelled: false };
             const cancelAll = () => {
-                cancelled = true;
+                cancellation.cancelled = true;
                 for (const xhr of activeXhrs) {
                     xhr.abort();
                 }
@@ -747,38 +809,20 @@ const initChat = async (root) => {
             try {
                 const fileKeyRaw = OneLineCrypto.randomRawKey();
                 const fileKey = await OneLineCrypto.importRawKey(fileKeyRaw);
-
-                const prepResp = await fetch(`/api/chats/${publicId}/attachments`, {
-                    method: 'POST',
-                    headers: apiHeaders({ 'Content-Type': 'application/json' }),
-                    credentials: 'same-origin',
-                    body: JSON.stringify({ chunks: cipherSizes }),
-                });
-                if (!prepResp.ok) {
-                    let reason = `prepare ${prepResp.status}`;
-                    try {
-                        const parsed = await prepResp.json();
-                        if (parsed?.error) {
-                            reason = parsed.error;
-                        }
-                    } catch {
-                    }
-                    throw new Error(reason);
-                }
-                const { attachmentId, chunks: chunkUploads } = await prepResp.json();
+                const { attachmentId, chunks: chunkUploads } = await requestUploadSlots(cipherSizes);
                 const uploadsByIndex = new Map(chunkUploads.map(c => [c.index, c.uploadUrl]));
 
                 let uploadedBytes = 0;
                 const totalPlainBytes = file.size || 1;
                 const uploadOne = async (i) => {
-                    if (cancelled) {
+                    if (cancellation.cancelled) {
                         return;
                     }
                     const start = i * CHUNK_PLAIN_BYTES;
                     const end = Math.min(file.size, start + CHUNK_PLAIN_BYTES);
                     const slice = await file.slice(start, end).arrayBuffer();
                     const cipher = await OneLineCrypto.encryptBytes(fileKey, new Uint8Array(slice));
-                    if (cancelled) {
+                    if (cancellation.cancelled) {
                         return;
                     }
                     const uploadUrl = uploadsByIndex.get(i);
@@ -796,22 +840,8 @@ const initChat = async (root) => {
                     setProgress(uploadedBytes / totalPlainBytes, file.name);
                 };
 
-                const queue = [];
-                for (let i = 0; i < chunkCount; i++) {
-                    queue.push(i);
-                }
-                const worker = async () => {
-                    while (queue.length > 0 && !cancelled) {
-                        const i = queue.shift();
-                        await uploadOne(i);
-                    }
-                };
-                const workers = [];
-                for (let i = 0; i < Math.min(UPLOAD_CONCURRENCY, chunkCount); i++) {
-                    workers.push(worker());
-                }
-                await Promise.all(workers);
-                if (cancelled) {
+                await runUploadPool(chunkCount, uploadOne);
+                if (cancellation.cancelled) {
                     const err = new Error('upload cancelled');
                     err.aborted = true;
                     throw err;
@@ -827,21 +857,7 @@ const initChat = async (root) => {
                     throw new Error('confirm ' + confirmResp.status);
                 }
 
-                const payload = JSON.stringify({
-                    k: FILE_MARKER_V2,
-                    id: attachmentId,
-                    name: file.name,
-                    mime: file.type || 'application/octet-stream',
-                    size: file.size,
-                    key: OneLineCrypto.base64Encode(fileKeyRaw),
-                    chunkCount,
-                });
-                const content = await OneLineCrypto.encrypt(cryptoKey, payload);
-                const messageId = crypto.randomUUID();
-                client.publish({
-                    destination: `/app/chat.${chatId}.send`,
-                    body: JSON.stringify({ clientMessageId: messageId, content }),
-                });
+                await publishAttachmentMessage(attachmentId, file, fileKeyRaw, chunkCount);
             } catch (e) {
                 if (e?.aborted) {
                     setStatus(statusEl.dataset.state || 'online', 'Upload cancelled');

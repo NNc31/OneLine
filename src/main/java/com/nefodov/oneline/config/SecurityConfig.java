@@ -26,7 +26,7 @@ public class SecurityConfig {
 
         return http
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRepository(new CookieCsrfTokenRepository())
                         .csrfTokenRequestHandler(new EagerCsrfTokenRequestHandler()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(headers -> headers
