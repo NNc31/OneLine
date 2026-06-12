@@ -6,7 +6,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,19 +19,29 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @Testcontainers
 class ChatLifecycleSchedulerTest {
 
     private static final Instant FAR_PAST = Instant.parse("2000-01-01T00:00:00Z");
+    private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
+
+    @TestConfiguration
+    static class TestClockConfig {
+        @Bean
+        @Primary
+        public Clock clock() {
+            return Clock.fixed(NOW, ZoneOffset.UTC);
+        }
+    }
 
     @Container
     @ServiceConnection
@@ -72,7 +85,7 @@ class ChatLifecycleSchedulerTest {
     @Transactional
     @DisplayName("No action on a fresh chat")
     void keepsFreshChat() {
-        Chat fresh = persistChatAt(Instant.now());
+        Chat fresh = persistChatAt(NOW);
         Long freshId = fresh.getId();
         scheduler.deleteInactiveChats();
         em.flush();

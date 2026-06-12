@@ -6,8 +6,6 @@ import com.nefodov.oneline.chat.ChatSession;
 import com.nefodov.oneline.security.MagicLinkAuthentication;
 import com.nefodov.oneline.security.TokenHasher;
 import lombok.AllArgsConstructor;
-import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessagingException;
@@ -21,7 +19,6 @@ import java.security.MessageDigest;
 import java.security.Principal;
 import java.util.Map;
 
-@NullMarked
 @Component
 @AllArgsConstructor
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
@@ -31,8 +28,9 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private final ChatParticipantService participantService;
     private final TokenHasher tokenHasher;
 
+    @SuppressWarnings("java:S2638")
     @Override
-    public @Nullable Message<?> preSend(Message<?> message, MessageChannel channel) {
+    public Message<?> preSend(Message<?> message, MessageChannel channel) {
         StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
         if (accessor == null || accessor.getCommand() == null) {
             return message;
