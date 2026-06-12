@@ -69,14 +69,16 @@ class AttachmentServiceTest {
     @Test
     @DisplayName("prepareUpload rejects a non-positive chunk size")
     void prepareUploadRejectsNonPositiveChunk() {
-        assertThrows(IllegalArgumentException.class, () -> service.prepareUpload(session, List.of(100L, 0L)));
+        List<Long> list = List.of(100L, 0L);
+        assertThrows(IllegalArgumentException.class, () -> service.prepareUpload(session, list));
         verify(repository, never()).save(any());
     }
 
     @Test
     @DisplayName("prepareUpload rejects a total exceeding the max file size")
     void prepareUploadRejectsOverMax() {
-        assertThrows(IllegalArgumentException.class, () -> service.prepareUpload(session, List.of(600L, 600L)));
+        List<Long> list = List.of(600L, 600L);
+        assertThrows(IllegalArgumentException.class, () -> service.prepareUpload(session, list));
         verify(repository, never()).save(any());
     }
 
