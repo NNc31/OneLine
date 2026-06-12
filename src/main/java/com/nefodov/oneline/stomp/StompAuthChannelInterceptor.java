@@ -6,6 +6,7 @@ import com.nefodov.oneline.chat.ChatSession;
 import com.nefodov.oneline.security.MagicLinkAuthentication;
 import com.nefodov.oneline.security.TokenHasher;
 import lombok.AllArgsConstructor;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -20,6 +21,7 @@ import java.security.MessageDigest;
 import java.security.Principal;
 import java.util.Map;
 
+@NullMarked
 @Component
 @AllArgsConstructor
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
