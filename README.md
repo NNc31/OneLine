@@ -24,6 +24,7 @@ Anonymous magic-link chat with end-to-end encryption. Create a room, share the l
 - **Observability.** Prometheus + Micrometer (`/actuator/prometheus`), custom counters for messages sent, attachments uploaded, rate-limits rejections and WS connections.
 
 ## Chat features
+
 - **End-to-end encrypted attachments.** Files are encrypted in the browser with a random per-file key. 
   The ciphertext blob is uploaded directly to MinIO via short-lived presigned URLs. 
   Image previews are rendered inline from decrypted blobs.

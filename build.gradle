@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.1'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.graalvm.buildtools.native' version '0.10.6'
     id 'org.sonarqube' version '7.3.0.8198'
     id 'jacoco'
 }
@@ -61,6 +62,17 @@ dependencies {
 }
 
 jacoco { toolVersion = '0.8.14' }
+
+graalvmNative {
+    metadataRepository {
+        enabled = true
+    }
+    binaries {
+        named('main') {
+            imageName = 'oneline'
+        }
+    }
+}
 
 sonar {
     properties {

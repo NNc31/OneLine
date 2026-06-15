@@ -1,0 +1,19 @@
+FROM container-registry.oracle.com/graalvm/native-image:21 AS builder
+WORKDIR /workspace
+
+RUN microdnf install -y findutils && microdnf clean all
+
+COPY gradlew settings.gradle build.gradle ./
+COPY gradle gradle
+RUN chmod +x gradlew && ./gradlew --no-daemon dependencies > /dev/null 2>&1 || true
+
+COPY src src
+RUN ./gradlew --no-daemon nativeCompile
+
+FROM gcr.io/distroless/base-debian12:nonroot
+WORKDIR /app
+
+COPY --from=builder --chown=nonroot:nonroot /workspace/build/native/nativeCompile/oneline /app/oneline
+
+EXPOSE 8080
+ENTRYPOINT ["/app/oneline", "-Duser.timezone=UTC"]
