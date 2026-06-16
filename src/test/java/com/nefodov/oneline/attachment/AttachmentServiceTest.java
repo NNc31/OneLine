@@ -221,6 +221,6 @@ class AttachmentServiceTest {
         OneLineProperties.Storage storage = new OneLineProperties.Storage(
                 "http://minio", "http://minio", "ak", "sk", "bucket",
                 Duration.ofMinutes(30), maxFileSize, Duration.ofMinutes(30));
-        return new OneLineProperties(null, null, null, null, storage, null);
+        return new OneLineProperties(null, null, null, storage, null);
     }
 }

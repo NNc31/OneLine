@@ -53,6 +53,7 @@ const initChat = async (root) => {
         'X-Chat-Token': authToken,
         'Accept': 'application/json',
         [csrfHeader]: csrfToken,
+        ...(sessionToken ? { 'X-Session-Token': sessionToken } : {}),
         ...extra,
     });
 
@@ -91,6 +92,12 @@ const initChat = async (root) => {
     let noMoreHistory = false;
     let messageTtlMs = null;
     let attachmentsEnabled = true;
+    let sessionToken = null;
+    try {
+        const stored = JSON.parse(localStorage.getItem('oneline.sessionChats') || '[]').find(c => c.publicId === publicId);
+        sessionToken = stored?.sessionToken || null;
+    } catch {
+    }
     const HISTORY_PAGE = 50;
     const MAX_TIMEOUT_MS = 2147483647;
     const FILE_MARKER_V1 = 'file/v1';
@@ -416,6 +423,7 @@ const initChat = async (root) => {
                 publicId,
                 secret: secret,
                 displayName: displayName || null,
+                sessionToken: sessionToken || null,
                 lastUsed: new Date().toISOString(),
             });
             localStorage.setItem(KEY, JSON.stringify(filtered.slice(0, 50)));
@@ -553,7 +561,7 @@ const initChat = async (root) => {
         const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
         const client = new StompJs.Client({
             brokerURL: wsUrl,
-            connectHeaders: { 'X-Chat-Token': authToken },
+            connectHeaders: { 'X-Chat-Token': authToken, 'X-Session-Token': sessionToken },
             reconnectDelay: 2000,
             heartbeatIncoming: 10000,
             heartbeatOutgoing: 10000,
@@ -991,6 +999,9 @@ const initChat = async (root) => {
             })
             .then(joined => {
                 chatId = joined.chatId;
+                if (joined.sessionToken) {
+                    sessionToken = joined.sessionToken;
+                }
                 return loadHistoryAndConnect(joined.me);
             })
             .catch(err => {

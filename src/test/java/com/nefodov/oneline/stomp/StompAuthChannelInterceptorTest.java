@@ -16,7 +16,6 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
 
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -64,7 +63,7 @@ class StompAuthChannelInterceptorTest {
         when(participantService.resolveBySession("sess")).thenReturn(Optional.of(participant));
 
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
-        accessor.setSessionAttributes(Map.of(SessionCookieHandshakeInterceptor.SESSION_TOKEN_ATTRIBUTE, "sess"));
+        accessor.setNativeHeader(StompAuthChannelInterceptor.SESSION_TOKEN_HEADER, "sess");
         accessor.setNativeHeader(StompAuthChannelInterceptor.CHAT_TOKEN_HEADER, "chat-token");
         accessor.setLeaveMutable(true);
         Message<byte[]> message = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
@@ -86,7 +85,7 @@ class StompAuthChannelInterceptorTest {
         when(tokenHasher.hash("chat-token")).thenReturn(CHAT_HASH);
         when(participantService.resolveBySession("sess")).thenReturn(Optional.empty());
         Message<byte[]> message = stompMessage(StompCommand.CONNECT, accessor -> {
-            accessor.setSessionAttributes(Map.of(SessionCookieHandshakeInterceptor.SESSION_TOKEN_ATTRIBUTE, "sess"));
+            accessor.setNativeHeader(StompAuthChannelInterceptor.SESSION_TOKEN_HEADER, "sess");
             accessor.setNativeHeader(StompAuthChannelInterceptor.CHAT_TOKEN_HEADER, "chat-token");
         });
         assertThrows(MessagingException.class, () -> interceptor.preSend(message, channel));
@@ -99,7 +98,7 @@ class StompAuthChannelInterceptorTest {
         when(tokenHasher.hash("chat-token")).thenReturn(CHAT_HASH);
         when(participantService.resolveBySession("sess")).thenReturn(Optional.of(participant));
         Message<byte[]> message = stompMessage(StompCommand.CONNECT, accessor -> {
-            accessor.setSessionAttributes(Map.of(SessionCookieHandshakeInterceptor.SESSION_TOKEN_ATTRIBUTE, "sess"));
+            accessor.setNativeHeader(StompAuthChannelInterceptor.SESSION_TOKEN_HEADER, "sess");
             accessor.setNativeHeader(StompAuthChannelInterceptor.CHAT_TOKEN_HEADER, "chat-token");
         });
         assertThrows(MessagingException.class, () -> interceptor.preSend(message, channel));

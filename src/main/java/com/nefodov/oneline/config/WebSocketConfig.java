@@ -1,6 +1,5 @@
 package com.nefodov.oneline.config;
 
-import com.nefodov.oneline.stomp.SessionCookieHandshakeInterceptor;
 import com.nefodov.oneline.stomp.StompAuthChannelInterceptor;
 import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -15,14 +14,12 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @AllArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    private final SessionCookieHandshakeInterceptor handshakeInterceptor;
     private final StompAuthChannelInterceptor authChannelInterceptor;
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
-                .addInterceptors(handshakeInterceptor);
+                .setAllowedOriginPatterns("*");
     }
 
     @Override

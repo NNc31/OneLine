@@ -74,14 +74,14 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
         ResponseEntity<String> confirm = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId + "/confirm",
                 HttpMethod.POST,
-                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.sessionToken())),
                 String.class);
         assertEquals(HttpStatus.OK, confirm.getStatusCode());
 
         ResponseEntity<Map<String, Object>> download = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId,
                 HttpMethod.GET,
-                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.sessionToken())),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, download.getStatusCode());
         List<Map<String, Object>> downloadChunks = chunksOf(download.getBody());
@@ -121,14 +121,14 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
         ResponseEntity<String> confirm = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId + "/confirm",
                 HttpMethod.POST,
-                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.sessionToken())),
                 String.class);
         assertEquals(HttpStatus.OK, confirm.getStatusCode());
 
         ResponseEntity<Map<String, Object>> download = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId,
                 HttpMethod.GET,
-                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.sessionToken())),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, download.getStatusCode());
         List<Map<String, Object>> downloadChunks = chunksOf(download.getBody());
@@ -155,7 +155,7 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
         ResponseEntity<String> resp = restTemplate.exchange(
                 "/api/chats/" + chatB.publicId() + "/attachments/" + attachmentId,
                 HttpMethod.GET,
-                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chatB.token(), chatB.cookie())),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chatB.token(), chatB.sessionToken())),
                 String.class);
         assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
     }
@@ -170,7 +170,7 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
         ResponseEntity<String> resp = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments/" + attachmentId + "/confirm",
                 HttpMethod.POST,
-                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chat.token(), chat.sessionToken())),
                 String.class);
         assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
     }
@@ -187,7 +187,7 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
         ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
                 "/api/chats/" + chat.publicId() + "/attachments",
                 HttpMethod.POST,
-                new HttpEntity<>(body.toString(), jsonHeadersWithChatTokenAndSession(chat.token(), chat.cookie())),
+                new HttpEntity<>(body.toString(), jsonHeadersWithChatTokenAndSession(chat.token(), chat.sessionToken())),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, resp.getStatusCode());
         assertNotNull(resp.getBody());
@@ -215,8 +215,8 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
                 new HttpEntity<>("{\"displayName\":\"Maelle\"}", joinHeaders),
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, joined.getStatusCode());
-        String cookie = extractCookie(joined.getHeaders().getFirst(HttpHeaders.SET_COOKIE));
-        return new Joined(publicId, authToken, cookie);
+        String sessionToken = (String) joined.getBody().get("sessionToken");
+        return new Joined(publicId, authToken, sessionToken);
     }
 
     private static byte[] randomBytes(int len) {
@@ -225,6 +225,6 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
         return bytes;
     }
 
-    private record Joined(String publicId, String token, String cookie) {
+    private record Joined(String publicId, String token, String sessionToken) {
     }
 }

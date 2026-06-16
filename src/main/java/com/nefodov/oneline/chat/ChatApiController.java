@@ -5,18 +5,16 @@ import com.nefodov.oneline.config.OneLineProperties;
 import com.nefodov.oneline.message.Message;
 import com.nefodov.oneline.message.MessageService;
 import com.nefodov.oneline.message.dto.MessageResponse;
-import com.nefodov.oneline.web.exception.NotFoundException;
 import com.nefodov.oneline.ratelimit.RateLimiter;
-import com.nefodov.oneline.security.SessionCookieFactory;
+import com.nefodov.oneline.web.exception.NotFoundException;
 import com.nefodov.oneline.web.exception.TooManyRequestsException;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,7 +32,6 @@ public class ChatApiController {
     private final ChatService chatService;
     private final ChatParticipantService participantService;
     private final MessageService messageService;
-    private final SessionCookieFactory sessionCookieFactory;
     private final RateLimiter rateLimiter;
     private final PresenceService presenceService;
     private final MeterRegistry meterRegistry;
@@ -58,16 +55,14 @@ public class ChatApiController {
         Chat chat = chatService.findActive(publicId, chatToken);
         if (session != null && session.chat().getId().equals(chat.getId())) {
             participantService.touch(session.participant());
-            return ResponseEntity.ok().body(new JoinChatResponse(chat.getId(), new ParticipantView(session.participant().getId(), session.participant().getDisplayName())));
+            return ResponseEntity.ok().body(new JoinChatResponse(chat.getId(), new ParticipantView(session.participant().getId(), session.participant().getDisplayName()), null));
         }
 
         enforceRateLimit(BUCKET_JOIN, httpRequest);
 
         ChatParticipantService.JoinedParticipant joined = participantService.join(chat, request.displayName());
-        ResponseCookie cookie = sessionCookieFactory.build(joined.sessionToken());
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(new JoinChatResponse(chat.getId(), new ParticipantView(joined.participant().getId(), joined.participant().getDisplayName())));
+                .body(new JoinChatResponse(chat.getId(), new ParticipantView(joined.participant().getId(), joined.participant().getDisplayName()), joined.sessionToken()));
     }
 
     @GetMapping("/{publicId}/presence")
@@ -99,7 +94,7 @@ public class ChatApiController {
     }
 
     private Chat resolveChat(UUID publicId, String chatToken) {
-        if (chatToken == null || chatToken.isBlank()) {
+        if (!StringUtils.hasText(chatToken)) {
             return chatService.findByPublicId(publicId);
         }
         try {

@@ -17,13 +17,13 @@ import org.springframework.stereotype.Component;
 
 import java.security.MessageDigest;
 import java.security.Principal;
-import java.util.Map;
 
 @Component
 @AllArgsConstructor
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     static final String CHAT_TOKEN_HEADER = "X-Chat-Token";
+    static final String SESSION_TOKEN_HEADER = "X-Session-Token";
 
     private final ChatParticipantService participantService;
     private final TokenHasher tokenHasher;
@@ -45,8 +45,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     }
 
     private void authenticate(StompHeaderAccessor accessor) {
-        Map<String, Object> attributes = accessor.getSessionAttributes();
-        String sessionToken = attributes == null ? null : (String) attributes.get(SessionCookieHandshakeInterceptor.SESSION_TOKEN_ATTRIBUTE);
+        String sessionToken = accessor.getFirstNativeHeader(SESSION_TOKEN_HEADER);
         String chatToken = accessor.getFirstNativeHeader(CHAT_TOKEN_HEADER);
         if (sessionToken == null || chatToken == null) {
             throw new MessagingException("Missing session or chat token");

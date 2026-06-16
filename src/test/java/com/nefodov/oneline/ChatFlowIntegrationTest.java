@@ -69,20 +69,20 @@ class ChatFlowIntegrationTest extends AbstractWebIntegrationTest {
                 JSON_OBJECT);
         assertEquals(HttpStatus.OK, joinResp.getStatusCode());
         long chatId = ((Number) joinResp.getBody().get("chatId")).longValue();
-        String sessionCookie = extractCookie(joinResp.getHeaders().getFirst(HttpHeaders.SET_COOKIE));
+        String sessionToken = (String) joinResp.getBody().get("sessionToken");
 
         byte[] opaque = new byte[]{0x01, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99, 99, 99, 99};
         String contentBase64 = Base64.getEncoder().encodeToString(opaque);
         String clientMessageId = UUID.randomUUID().toString();
 
-        StompSession ws = connectStomp(chat.token(), sessionCookie);
+        StompSession ws = connectStomp(chat.token(), sessionToken);
         StompHeaders sendHeaders = new StompHeaders();
         sendHeaders.setDestination("/app/chat." + chatId + ".send");
         sendHeaders.setContentType(MimeTypeUtils.APPLICATION_JSON);
         String body = String.format("{\"clientMessageId\":\"%s\",\"content\":\"%s\"}", clientMessageId, contentBase64);
         ws.send(sendHeaders, body.getBytes(StandardCharsets.UTF_8));
 
-        List<Map<String, Object>> history = awaitHistory(chat.publicId(), chat.token(), sessionCookie, 1);
+        List<Map<String, Object>> history = awaitHistory(chat.publicId(), chat.token(), sessionToken, 1);
         ws.disconnect();
 
         assertEquals(1, history.size());
@@ -163,17 +163,17 @@ class ChatFlowIntegrationTest extends AbstractWebIntegrationTest {
         return new CreatedChat(publicId, authToken);
     }
 
-    private StompSession connectStomp(String chatToken, String sessionCookie) throws Exception {
+    private StompSession connectStomp(String chatToken, String sessionToken) throws Exception {
         WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
         stompClient.setMessageConverter(new SimpleMessageConverter());
         WebSocketHttpHeaders handshakeHeaders = new WebSocketHttpHeaders();
-        handshakeHeaders.add(HttpHeaders.COOKIE, sessionCookie);
         StompHeaders connectHeaders = new StompHeaders();
         connectHeaders.add(CHAT_TOKEN_HEADER, chatToken);
+        connectHeaders.add(SESSION_TOKEN_HEADER, sessionToken);
         return stompClient.connectAsync("ws://localhost:" + port + "/ws", handshakeHeaders, connectHeaders, new StompSessionHandlerAdapter() {}).get(5, TimeUnit.SECONDS);
     }
 
-    private List<Map<String, Object>> awaitHistory(String publicId, String chatToken, String cookie, int expectedSize) {
+    private List<Map<String, Object>> awaitHistory(String publicId, String chatToken, String sessionToken, int expectedSize) {
         AtomicReference<List<Map<String, Object>>> last = new AtomicReference<>(List.of());
         await().atMost(Duration.ofSeconds(3))
                 .pollInterval(Duration.ofMillis(100))
@@ -181,7 +181,7 @@ class ChatFlowIntegrationTest extends AbstractWebIntegrationTest {
                     ResponseEntity<List<Map<String, Object>>> resp = restTemplate.exchange(
                             "/api/chats/" + publicId + "/messages",
                             HttpMethod.GET,
-                            new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chatToken, cookie)),
+                            new HttpEntity<>(null, jsonHeadersWithChatTokenAndSession(chatToken, sessionToken)),
                             JSON_LIST);
                     last.set(resp.getBody() == null ? List.of() : resp.getBody());
                     return last.get().size() >= expectedSize;

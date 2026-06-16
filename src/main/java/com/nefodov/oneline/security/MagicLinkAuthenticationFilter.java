@@ -1,17 +1,14 @@
 package com.nefodov.oneline.security;
 
 import com.nefodov.oneline.chat.*;
-import com.nefodov.oneline.config.OneLineProperties;
-import com.nefodov.oneline.security.SessionCookieFactory;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.AllArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -25,19 +22,17 @@ import java.util.regex.Pattern;
 public class MagicLinkAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String CHAT_TOKEN_HEADER = "X-Chat-Token";
+    private static final String SESSION_TOKEN_HEADER = "X-Session-Token";
     private static final Pattern CHAT_PATH = Pattern.compile("^(?:/api/chats|/c)/(?<publicId>[0-9a-fA-F-]{36})(?:/.*)?$");
 
     private final ChatService chatService;
     private final ChatParticipantService participantService;
-    private final OneLineProperties properties;
-    private final SessionCookieFactory sessionCookieFactory;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
-        String sessionToken = readSessionCookie(request);
+        String sessionToken = readSessionHeader(request);
         authenticate(request, sessionToken).ifPresent(auth -> {
             SecurityContextHolder.getContext().setAuthentication(auth);
-            response.addHeader(HttpHeaders.SET_COOKIE, sessionCookieFactory.build(sessionToken).toString());
         });
         chain.doFilter(request, response);
     }
@@ -48,7 +43,7 @@ public class MagicLinkAuthenticationFilter extends OncePerRequestFilter {
             return Optional.empty();
         }
         String chatToken = request.getHeader(CHAT_TOKEN_HEADER);
-        if (chatToken == null || chatToken.isBlank()) {
+        if (!StringUtils.hasText(chatToken)) {
             return Optional.empty();
         }
         if (sessionToken == null) {
@@ -77,18 +72,9 @@ public class MagicLinkAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private String readSessionCookie(HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) {
-            return null;
-        }
-        String name = properties.session().cookieName();
-        for (Cookie cookie : cookies) {
-            if (name.equals(cookie.getName())) {
-                return cookie.getValue();
-            }
-        }
-        return null;
+    private String readSessionHeader(HttpServletRequest request) {
+        String sessionToken = request.getHeader(SESSION_TOKEN_HEADER);
+        return StringUtils.hasText(sessionToken) ? sessionToken : null;
     }
 
     private boolean belongsToChat(ChatParticipant participant, Chat chat) {

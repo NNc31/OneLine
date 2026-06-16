@@ -13,6 +13,7 @@ import java.util.List;
 public abstract class AbstractWebIntegrationTest {
 
     protected static final String CHAT_TOKEN_HEADER = "X-Chat-Token";
+    protected static final String SESSION_TOKEN_HEADER = "X-Session-Token";
 
     @Autowired
     protected TestRestTemplate restTemplate;
@@ -51,19 +52,9 @@ public abstract class AbstractWebIntegrationTest {
         return headers;
     }
 
-    protected final HttpHeaders jsonHeadersWithChatTokenAndSession(String chatToken, String sessionCookie) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-        String token = csrfToken();
-        headers.add(CHAT_TOKEN_HEADER, chatToken);
-        headers.add("X-XSRF-TOKEN", token);
-        headers.add(HttpHeaders.COOKIE, sessionCookie + "; XSRF-TOKEN=" + token);
+    protected final HttpHeaders jsonHeadersWithChatTokenAndSession(String chatToken, String sessionToken) {
+        HttpHeaders headers = jsonHeadersWithChatToken(chatToken);
+        headers.add(SESSION_TOKEN_HEADER, sessionToken);
         return headers;
-    }
-
-    protected static String extractCookie(String setCookieHeader) {
-        int semi = setCookieHeader.indexOf(';');
-        return semi < 0 ? setCookieHeader : setCookieHeader.substring(0, semi);
     }
 }

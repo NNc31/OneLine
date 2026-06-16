@@ -45,11 +45,6 @@ management:
 oneline:
   participant:
     activity-window: PT10M
-  session:
-    cookie-name: oneline_session
-    cookie-secure: false
-    cookie-same-site: Lax
-    cookie-max-age: P30D
   rate-limit:
     create-chat:
       capacity: 5
