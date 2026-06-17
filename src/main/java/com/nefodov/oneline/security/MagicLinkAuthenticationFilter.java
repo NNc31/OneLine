@@ -31,9 +31,7 @@ public class MagicLinkAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
         String sessionToken = readSessionHeader(request);
-        authenticate(request, sessionToken).ifPresent(auth -> {
-            SecurityContextHolder.getContext().setAuthentication(auth);
-        });
+        authenticate(request, sessionToken).ifPresent(auth -> SecurityContextHolder.getContext().setAuthentication(auth));
         chain.doFilter(request, response);
     }
 
