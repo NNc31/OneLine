@@ -2,6 +2,7 @@
     const KEY = 'oneline.sessionChats';
     const listEl = document.getElementById('session-chats-list');
     const emptyEl = document.getElementById('session-chats-empty');
+    let selected = -1;
 
     const TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
         year: 'numeric',
@@ -72,11 +73,51 @@
         listEl.innerHTML = '';
         if (list.length === 0) {
             emptyEl.hidden = false;
+            selected = -1;
             return;
         }
         emptyEl.hidden = true;
         list.forEach(chat => listEl.appendChild(buildChatItem(chat)));
+        selected = 0;
+        highlight();
     }
+
+    const items = () => Array.from(listEl.children);
+
+    const highlight = () => {
+        items().forEach((li, i) => li.classList.toggle('selected', i === selected));
+        if (selected >= 0) {
+            items()[selected].scrollIntoView({ block: 'nearest' });
+        }
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Backspace') {
+            e.preventDefault();
+            globalThis.location.assign('/');
+            return;
+        }
+        const count = listEl.children.length;
+        if (count === 0) {
+            return;
+        }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selected = Math.min(count - 1, selected + 1);
+            highlight();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selected = Math.max(0, selected - 1);
+            highlight();
+        } else if (e.key === 'Enter' && selected >= 0) {
+            const active = document.activeElement;
+            if (active && (active.tagName === 'BUTTON' || active.tagName === 'A')) {
+                return;
+            }
+            e.preventDefault();
+            items()[selected].querySelector('a').click();
+        }
+    });
 
     render();
 })();

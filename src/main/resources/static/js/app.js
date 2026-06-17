@@ -71,6 +71,7 @@ const initChat = async (root) => {
         statusEl.hidden = false;
         meBadgeEl.textContent = me.displayName;
         meBadgeEl.hidden = false;
+        sendInputEl.focus();
     };
 
     const setStatus = (state, text) => {
@@ -82,6 +83,25 @@ const initChat = async (root) => {
         const d = new Date(iso);
         return Number.isNaN(d.getTime()) ? '--:--' : TIME_FORMATTER.format(d);
     };
+
+    const isEditing = () => {
+        const el = document.activeElement;
+        return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Backspace' && !isEditing()) {
+            e.preventDefault();
+            globalThis.location.assign('/me');
+            return;
+        }
+        if (chatRoomEl.hidden || (lightboxEl && lightboxEl.open)) {
+            return;
+        }
+        if (!isEditing() && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+            sendInputEl.focus();
+        }
+    });
 
     const seenMessageIds = new Set();
     let meId = null;

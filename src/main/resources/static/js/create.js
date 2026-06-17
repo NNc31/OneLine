@@ -49,4 +49,11 @@
             }
         }
     });
+
+    [ttlValueEl, ttlUnitEl].forEach(el => el?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !btn.disabled) {
+            e.preventDefault();
+            btn.click();
+        }
+    }));
 })();
