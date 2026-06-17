@@ -2,12 +2,12 @@ package com.nefodov.oneline.chat;
 
 import com.nefodov.oneline.chat.dto.*;
 import com.nefodov.oneline.config.OneLineProperties;
+import com.nefodov.oneline.exception.NotFoundException;
+import com.nefodov.oneline.exception.TooManyRequestsException;
 import com.nefodov.oneline.message.Message;
 import com.nefodov.oneline.message.MessageService;
 import com.nefodov.oneline.message.dto.MessageResponse;
 import com.nefodov.oneline.ratelimit.RateLimiter;
-import com.nefodov.oneline.web.exception.NotFoundException;
-import com.nefodov.oneline.web.exception.TooManyRequestsException;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;

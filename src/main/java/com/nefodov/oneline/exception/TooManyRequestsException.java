@@ -1,4 +1,4 @@
-package com.nefodov.oneline.web.exception;
+package com.nefodov.oneline.exception;
 
 public class TooManyRequestsException extends RuntimeException {
 

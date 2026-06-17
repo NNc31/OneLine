@@ -6,7 +6,7 @@ import com.nefodov.oneline.chat.Chat;
 import com.nefodov.oneline.chat.ChatParticipant;
 import com.nefodov.oneline.chat.ChatSession;
 import com.nefodov.oneline.config.OneLineProperties;
-import com.nefodov.oneline.web.exception.NotFoundException;
+import com.nefodov.oneline.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

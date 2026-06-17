@@ -1,5 +1,9 @@
-package com.nefodov.oneline.web.exception;
+package com.nefodov.oneline.web;
 
+import com.nefodov.oneline.exception.ConflictException;
+import com.nefodov.oneline.exception.NotFoundException;
+import com.nefodov.oneline.exception.StorageException;
+import com.nefodov.oneline.exception.TooManyRequestsException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

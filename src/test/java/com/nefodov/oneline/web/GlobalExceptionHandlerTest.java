@@ -1,5 +1,9 @@
-package com.nefodov.oneline.web.exception;
+package com.nefodov.oneline.web;
 
+import com.nefodov.oneline.exception.ConflictException;
+import com.nefodov.oneline.exception.NotFoundException;
+import com.nefodov.oneline.exception.StorageException;
+import com.nefodov.oneline.exception.TooManyRequestsException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;

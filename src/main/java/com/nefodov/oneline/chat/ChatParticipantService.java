@@ -1,7 +1,7 @@
 package com.nefodov.oneline.chat;
 
-import com.nefodov.oneline.web.exception.ConflictException;
 import com.nefodov.oneline.config.OneLineProperties;
+import com.nefodov.oneline.exception.ConflictException;
 import com.nefodov.oneline.security.TokenGenerator;
 import com.nefodov.oneline.security.TokenHasher;
 import lombok.AllArgsConstructor;

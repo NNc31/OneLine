@@ -4,16 +4,12 @@ import com.nefodov.oneline.attachment.dto.AttachmentDownloadResponse;
 import com.nefodov.oneline.attachment.dto.AttachmentUploadResponse;
 import com.nefodov.oneline.chat.ChatSession;
 import com.nefodov.oneline.config.OneLineProperties;
-import com.nefodov.oneline.web.exception.NotFoundException;
+import com.nefodov.oneline.exception.NotFoundException;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.OptionalLong;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @AllArgsConstructor

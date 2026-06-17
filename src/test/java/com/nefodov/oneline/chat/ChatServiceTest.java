@@ -1,7 +1,7 @@
 package com.nefodov.oneline.chat;
 
+import com.nefodov.oneline.exception.NotFoundException;
 import com.nefodov.oneline.security.TokenHasher;
-import com.nefodov.oneline.web.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
