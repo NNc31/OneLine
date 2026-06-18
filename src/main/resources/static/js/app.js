@@ -95,7 +95,7 @@ const initChat = async (root) => {
             globalThis.location.assign('/me');
             return;
         }
-        if (chatRoomEl.hidden || (lightboxEl && lightboxEl.open)) {
+        if (chatRoomEl.hidden || lightboxEl?.open) {
             return;
         }
         if (!isEditing() && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
