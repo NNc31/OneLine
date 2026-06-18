@@ -1,4 +1,4 @@
-FROM container-registry.oracle.com/graalvm/native-image:21 AS builder
+FROM container-registry.oracle.com/graalvm/native-image:25 AS builder
 WORKDIR /workspace
 
 RUN microdnf install -y findutils && microdnf clean all
