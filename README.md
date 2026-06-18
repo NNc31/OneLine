@@ -8,12 +8,13 @@ Anonymous magic-link chat with end-to-end encryption. Create a room, share the l
   A 256-bit secret is generated in the browser and lives only in the URL fragment (`/c/{publicId}#{secret}`).
   Client derives via HKDF-SHA256 two independent values: an **auth token** and an **AES-256-GCM message key**. 
   Auth token is sent to the server for authentication and routing, message key stays in the browser for encryption and decryption.
-- **"Session chats" live in the browser.** JS layer saves `{publicId, secret, displayName}` to `localStorage`. The `/me` page lists stored chats.
-- **Sliding, idempotent session.** Random session token generated during joining, 
-  stored hashed in the DB and handed back as an `HttpOnly` cookie.
-  Every authenticated request re-issues the cookie with a fresh `Max-Age`,
-  so an active participant is never logged out at the 30-day mark.
-  Re-opening a chat in which you already hold a session reuses the same participant.
+- **"Session chats" live in the browser.** JS layer saves `{publicId, secret, displayName,  sessionToken, signing keys}` to `localStorage`. The `/me` page lists stored chats.
+- **Per-chat session, no shared cookie.** Random session token generated on join, stored hashed in the DB.
+  Lets you hold independent sessions in many chats at once. Re-opening a chat reuses the same participant.
+- **Cryptographic message authorship (Ed25519).** Each participant holds a per-chat signing keypair.
+  The private key never leaves the browser. Every message is signed inside the encrypted payload.
+  Receivers verify the signature and pin each participant's public key on first use.
+  A tampering server cannot forge or relabel authorship. A badge marks verified and unverified messages.
 - **Redis-backed broadcast and rate limits.** A Redis pub/sub channel fans messages out across app instances.
   The local in-process broker handles per-instance STOMP delivery.
   Rate limiting uses Bucket4j token buckets stored in Redis, the limits are atomic and shared across instances.
@@ -25,23 +26,25 @@ Anonymous magic-link chat with end-to-end encryption. Create a room, share the l
 
 ## Chat features
 
-- **End-to-end encrypted attachments.** Files are encrypted in the browser with a random per-file key. 
-  The ciphertext blob is uploaded directly to MinIO via short-lived presigned URLs. 
+- **End-to-end encrypted chunked attachments.** Files are split into 4 MB chunks and encrypted in the browser with a random per-file key. 
+  The ciphertext is uploaded directly to MinIO via short-lived presigned URLs. 
   Image previews are rendered inline from decrypted blobs.
+  A daily per-participant upload quota and a server kill switch guard against abuse. Drag-and-drop and clipboard paste supported.
 - **Self-destruct messages.** Each chat can set a TTL (minutes/hours/days). 
   The frontend filters expired messages on render. A backend removes them and their attachment objects in MinIO periodically.
 - **Presence with typing indicators.** Heartbeats over STOMP. Stale participants drop after a configurable window.
 
 ## Stack
 
-- Java 21, Spring Boot 4.0, Spring Security, Spring WebSocket (STOMP)
+- Java 25, Spring Boot 4.0, Spring Security, Spring WebSocket (STOMP)
 - Hibernate ORM 7, Postgres 16, Flyway 11, Redis 7, MinIO
 - Bucket4j (Redis-backed), Micrometer + Prometheus
 - Thymeleaf, minimal CSS, self-hosted `@stomp/stompjs`
+- Optional GraalVM native image build. See [`docs/NATIVE.md`](docs/NATIVE.md)
 
 ## Running locally
 
-Requirements: Docker and a Java 21 JDK.
+Requirements: Docker and a Java 25 JDK.
 
 1. Clone the repo and `cd` into it.
 2. Run the following to start Postgres, Redis, MinIO and OneLine.
@@ -72,13 +75,14 @@ Application-level:
 | Key                                   | Purpose                                                                  |
 |---------------------------------------|--------------------------------------------------------------------------|
 | `oneline.participant.activity-window` | How long a display name stays reserved after the holder went idle        |
-| `oneline.session.cookie-max-age`      | Lifetime of the session cookie in the browser                            |
 | `oneline.rate-limit.*`                | Bucket capacity and refill period per endpoint group                     |
 | `oneline.retention.inactivity-window` | How long a chat with no recent activity is kept before automatic removal |
 | `oneline.retention.cron` and `.zone`  | Cron expression and time zone for the cleanup job                        |
 | `oneline.storage.max-file-size`       | Attachment size cap                                                      |
 | `oneline.storage.presign-ttl`         | Lifetime of presigned upload/download URLs                               |
 | `oneline.storage.unconfirmed-ttl`     | Lifetime of reserved, not uploaded attachment row                        |
+| `oneline.attachments.enabled`         | Kill switch for uploads                                                  |
+| `oneline.attachments.ttl`             | How long an attachment is kept before automatic removal                  |
 
 ## What this is not
 
