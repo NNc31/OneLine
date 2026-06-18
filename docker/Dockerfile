@@ -8,10 +8,12 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon dependencies >
 COPY src src
 RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon bootJar
 
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM eclipse-temurin:25-jre
 WORKDIR /app
 
-COPY --from=builder --chown=nonroot:nonroot /workspace/build/libs/*.jar /app/app.jar
+RUN useradd -r -u 1001 oneline
+COPY --from=builder --chown=oneline:oneline /workspace/build/libs/*.jar /app/app.jar
+USER oneline
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -Duser.timezone=UTC"
 EXPOSE 8080
