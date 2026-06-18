@@ -134,8 +134,30 @@ globalThis.OneLineCrypto = (() => {
         );
     };
 
+    const generateSigningKeys = async () => {
+        const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+        const pub = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
+        const priv = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+        return { publicKeyB64: base64Encode(pub), privateKeyB64: base64Encode(priv) };
+    };
+
+    const sign = async (privateKeyB64, message) => {
+        const key = await crypto.subtle.importKey('pkcs8', base64Decode(privateKeyB64), { name: 'Ed25519' }, false, ['sign']);
+        const sig = new Uint8Array(await crypto.subtle.sign({ name: 'Ed25519' }, key, new TextEncoder().encode(message)));
+        return base64Encode(sig);
+    };
+
+    const verify = async (publicKeyB64, signatureB64, message) => {
+        try {
+            const key = await crypto.subtle.importKey('raw', base64Decode(publicKeyB64), { name: 'Ed25519' }, false, ['verify']);
+            return await crypto.subtle.verify({ name: 'Ed25519' }, key, base64Decode(signatureB64), new TextEncoder().encode(message));
+        } catch {
+            return false;
+        }
+    };
+
     return {
         randomSecret, deriveAuthToken, deriveKey, encrypt, decrypt, base64Encode, base64Decode,
-        importRawKey, randomRawKey, encryptBytes, decryptBytes,
+        importRawKey, randomRawKey, encryptBytes, decryptBytes, generateSigningKeys, sign, verify,
     };
 })();

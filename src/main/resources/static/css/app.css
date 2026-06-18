@@ -500,6 +500,14 @@ body.chat-page {
     overflow-wrap: anywhere;
 }
 
+.message .authorship {
+    margin-left: 4px;
+    font-weight: 700;
+    cursor: help;
+}
+.message .authorship.verified { color: var(--online); }
+.message .authorship.warn { color: var(--error); }
+
 .message time {
     grid-column: 2;
     grid-row: 1;

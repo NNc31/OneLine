@@ -113,11 +113,78 @@ const initChat = async (root) => {
     let messageTtlMs = null;
     let attachmentsEnabled = true;
     let sessionToken = null;
+    let signPriv = null;
+    let signPub = null;
     try {
         const stored = JSON.parse(localStorage.getItem('oneline.sessionChats') || '[]').find(c => c.publicId === publicId);
         sessionToken = stored?.sessionToken || null;
+        signPriv = stored?.signPriv || null;
+        signPub = stored?.signPub || null;
     } catch {
     }
+
+    const PINS_KEY = `oneline.identity.${publicId}`;
+    const identityPins = (() => {
+        try {
+            return JSON.parse(localStorage.getItem(PINS_KEY) || '{}');
+        } catch {
+            return {};
+        }
+    })();
+    const persistPins = () => {
+        try {
+            localStorage.setItem(PINS_KEY, JSON.stringify(identityPins));
+        } catch {
+
+        }
+    };
+    const SIGN_PREFIX = 'oneline.msg.v1';
+    const signingInput = (cmid, body) => `${SIGN_PREFIX}:${cmid}:${body}`;
+
+    const ensureSigningKeys = async () => {
+        if (signPriv && signPub) {
+            return;
+        }
+        try {
+            const keys = await OneLineCrypto.generateSigningKeys();
+            signPriv = keys.privateKeyB64;
+            signPub = keys.publicKeyB64;
+        } catch (e) {
+            console.warn('Ed25519 unavailable. Messages will be sent unsigned', e);
+        }
+    };
+
+    const buildSignedEnvelope = async (cmid, body) => {
+        const sig = await OneLineCrypto.sign(signPriv, signingInput(cmid, body));
+        return JSON.stringify({ v: 1, body, cmid, pk: signPub, sig });
+    };
+
+    const resolveMessage = async (m, plaintext) => {
+        let env = null;
+        try {
+            const obj = JSON.parse(plaintext);
+            if (obj?.v === 1 && typeof obj.body === 'string' && typeof obj.pk === 'string' && typeof obj.sig === 'string') {
+                env = obj;
+            }
+        } catch {
+        }
+        if (!env) {
+            return { body: plaintext, status: 'unsigned' };
+        }
+        const ok = await OneLineCrypto.verify(env.pk, env.sig, signingInput(env.cmid, env.body));
+        if (!ok) {
+            return { body: env.body, status: 'unverified' };
+        }
+        const pid = String(m.participantId);
+        const pinned = identityPins[pid];
+        if (!pinned) {
+            identityPins[pid] = env.pk;
+            persistPins();
+            return { body: env.body, status: 'verified' };
+        }
+        return { body: env.body, status: pinned === env.pk ? 'verified' : 'mismatch' };
+    };
+
     const HISTORY_PAGE = 50;
     const MAX_TIMEOUT_MS = 2147483647;
     const FILE_MARKER_V1 = 'file/v1';
@@ -317,7 +384,26 @@ const initChat = async (root) => {
         body.appendChild(btn);
     };
 
-    const createMessageEl = (m, plaintext) => {
+    const buildAuthorshipBadge = (status) => {
+        if (status === 'unsigned') {
+            return null;
+        }
+        const badge = document.createElement('span');
+        badge.className = 'authorship ' + (status === 'verified' ? 'verified' : 'warn');
+        if (status === 'verified') {
+            badge.textContent = '+';
+            badge.title = 'Author verified';
+        } else if (status === 'mismatch') {
+            badge.textContent = '!';
+            badge.title = 'Signing key changed';
+        } else {
+            badge.textContent = '!';
+            badge.title = 'Author not verified';
+        }
+        return badge;
+    };
+
+    const createMessageEl = (m, body, status) => {
         if (seenMessageIds.has(m.id)) {
             return null;
         }
@@ -336,21 +422,25 @@ const initChat = async (root) => {
         const author = document.createElement('span');
         author.className = 'author';
         author.textContent = m.displayName;
+        const badge = buildAuthorshipBadge(status);
+        if (badge) {
+            author.appendChild(badge);
+        }
 
         const time = document.createElement('time');
         time.dateTime = m.createdAt;
         time.textContent = formatTime(m.createdAt);
 
-        const body = document.createElement('span');
-        body.className = 'body';
-        const filePayload = parseFilePayload(plaintext);
+        const bodyEl = document.createElement('span');
+        bodyEl.className = 'body';
+        const filePayload = parseFilePayload(body);
         if (filePayload) {
-            renderFileBody(li, body, filePayload);
+            renderFileBody(li, bodyEl, filePayload);
         } else {
-            body.textContent = plaintext;
+            bodyEl.textContent = body;
         }
 
-        li.append(author, time, body);
+        li.append(author, time, bodyEl);
         if (remainingMs != null && remainingMs <= MAX_TIMEOUT_MS) {
             setTimeout(() => {
                 revokeUrls(li);
@@ -360,8 +450,8 @@ const initChat = async (root) => {
         return li;
     };
 
-    const renderMessage = (m, plaintext) => {
-        const li = createMessageEl(m, plaintext);
+    const renderMessage = (m, body, status) => {
+        const li = createMessageEl(m, body, status);
         if (li) {
             messagesEl.appendChild(li);
         }
@@ -392,7 +482,8 @@ const initChat = async (root) => {
             for (const m of batch.slice().reverse()) {
                 try {
                     const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
-                    const li = createMessageEl(m, plaintext);
+                    const resolved = await resolveMessage(m, plaintext);
+                    const li = createMessageEl(m, resolved.body, resolved.status);
                     if (li) {
                         fragment.appendChild(li);
                     }
@@ -422,8 +513,9 @@ const initChat = async (root) => {
     const decryptAndRender = async (m) => {
         try {
             const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
+            const resolved = await resolveMessage(m, plaintext);
             const isNew = !seenMessageIds.has(m.id);
-            renderMessage(m, plaintext);
+            renderMessage(m, resolved.body, resolved.status);
             messagesEl.scrollTop = messagesEl.scrollHeight;
             if (isNew && m.participantId !== meId && globalThis.OneLineSound) {
                 globalThis.OneLineSound.play();
@@ -444,6 +536,8 @@ const initChat = async (root) => {
                 secret: secret,
                 displayName: displayName || null,
                 sessionToken: sessionToken || null,
+                signPriv: signPriv || null,
+                signPub: signPub || null,
                 lastUsed: new Date().toISOString(),
             });
             localStorage.setItem(KEY, JSON.stringify(filtered.slice(0, 50)));
@@ -455,6 +549,7 @@ const initChat = async (root) => {
     const loadHistoryAndConnect = async (me) => {
         meId = me.id;
         showChatRoom(me);
+        await ensureSigningKeys();
         rememberChat(me.displayName);
 
         try {
@@ -478,7 +573,8 @@ const initChat = async (root) => {
             for (const m of history.slice().reverse()) {
                 try {
                     const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
-                    renderMessage(m, plaintext);
+                    const resolved = await resolveMessage(m, plaintext);
+                    renderMessage(m, resolved.body, resolved.status);
                 } catch (e) {
                     console.error('Skipping undecryptable message', m.id, e);
                 }
@@ -692,14 +788,15 @@ const initChat = async (root) => {
             if (!plaintext || !client.connected || !cryptoKey) {
                 return;
             }
+            const id = crypto.randomUUID();
             let ciphertextBase64;
             try {
-                ciphertextBase64 = await OneLineCrypto.encrypt(cryptoKey, plaintext);
+                const envelope = signPriv ? await buildSignedEnvelope(id, plaintext) : plaintext;
+                ciphertextBase64 = await OneLineCrypto.encrypt(cryptoKey, envelope);
             } catch (err) {
                 console.error('Encrypt failed', err);
                 return;
             }
-            const id = crypto.randomUUID();
             client.publish({
                 destination: `/app/chat.${chatId}.send`,
                 body: JSON.stringify({ clientMessageId: id, content: ciphertextBase64 }),
@@ -799,10 +896,12 @@ const initChat = async (root) => {
                 key: OneLineCrypto.base64Encode(fileKeyRaw),
                 chunkCount,
             });
-            const content = await OneLineCrypto.encrypt(cryptoKey, payload);
+            const messageId = crypto.randomUUID();
+            const envelope = signPriv ? await buildSignedEnvelope(messageId, payload) : payload;
+            const content = await OneLineCrypto.encrypt(cryptoKey, envelope);
             client.publish({
                 destination: `/app/chat.${chatId}.send`,
-                body: JSON.stringify({ clientMessageId: crypto.randomUUID(), content }),
+                body: JSON.stringify({ clientMessageId: messageId, content }),
             });
         };
 
