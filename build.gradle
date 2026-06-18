@@ -34,7 +34,7 @@ dependencies {
 
     implementation 'com.bucket4j:bucket4j-core:8.10.1'
     implementation 'com.bucket4j:bucket4j-redis:8.10.1'
-    implementation 'io.minio:minio:8.5.12'
+    implementation 'io.minio:minio:9.0.3'
     runtimeOnly 'org.postgresql:postgresql'
 
     implementation 'org.springframework.boot:spring-boot-flyway'
