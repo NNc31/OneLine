@@ -79,9 +79,20 @@ const initChat = async (root) => {
         statusEl.textContent = text;
     };
 
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    const formatDate = (d) => {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${pad(d.getFullYear() % 100)}`;
+    };
+
     const formatTime = (iso) => {
         const d = new Date(iso);
-        return Number.isNaN(d.getTime()) ? '--:--' : TIME_FORMATTER.format(d);
+        if (Number.isNaN(d.getTime())) {
+            return '--:--';
+        }
+        const time = TIME_FORMATTER.format(d);
+        return Date.now() - d.getTime() >= DAY_MS ? `${formatDate(d)} ${time}` : time;
     };
 
     const isEditing = () => {
