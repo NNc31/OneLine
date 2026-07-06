@@ -816,7 +816,9 @@ const initChat = async (root) => {
         const MAX_INPUT_HEIGHT = 140;
         const autoGrowInput = () => {
             sendInputEl.style.height = 'auto';
-            sendInputEl.style.height = Math.min(sendInputEl.scrollHeight, MAX_INPUT_HEIGHT) + 'px';
+            const contentHeight = sendInputEl.scrollHeight;
+            sendInputEl.style.height = Math.min(contentHeight, MAX_INPUT_HEIGHT) + 'px';
+            sendInputEl.style.overflowY = contentHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden';
         };
         sendInputEl.addEventListener('input', autoGrowInput);
         sendInputEl.addEventListener('keydown', (e) => {

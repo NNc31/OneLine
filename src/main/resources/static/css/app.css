@@ -573,9 +573,11 @@ body.chat-page {
     font: inherit;
     line-height: 1.4;
     resize: none;
-    overflow-y: auto;
+    overflow-y: hidden;
     max-height: 140px;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
 }
 
 .send textarea:focus {
@@ -584,11 +586,16 @@ body.chat-page {
     box-shadow: 0 0 0 3px var(--ring);
 }
 
+.send textarea::-webkit-scrollbar { width: 8px; }
+.send textarea::-webkit-scrollbar-track { background: transparent; }
+.send textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+
 .send .attach {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0 10px;
+    min-height: 46px;
     background: transparent;
     border: 1px solid var(--border);
     border-radius: 8px;
