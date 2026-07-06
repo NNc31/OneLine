@@ -468,6 +468,21 @@ const initChat = async (root) => {
         }
     };
 
+    const NEAR_BOTTOM_PX = 120;
+    const isNearBottom = () => messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < NEAR_BOTTOM_PX;
+    const scrollToBottom = () => { messagesEl.scrollTop = messagesEl.scrollHeight; };
+
+    const addSystemNote = (text) => {
+        const stick = isNearBottom();
+        const li = document.createElement('li');
+        li.className = 'system-note';
+        li.textContent = text;
+        messagesEl.appendChild(li);
+        if (stick) {
+            scrollToBottom();
+        }
+    };
+
     const loadOlder = async () => {
         if (loadingOlder || noMoreHistory || oldestMessageId == null || !cryptoKey) {
             return;
@@ -526,8 +541,11 @@ const initChat = async (root) => {
             const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
             const resolved = await resolveMessage(m, plaintext);
             const isNew = !seenMessageIds.has(m.id);
+            const stick = isNearBottom() || m.participantId === meId;
             renderMessage(m, resolved.body, resolved.status);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            if (stick) {
+                scrollToBottom();
+            }
             if (isNew && m.participantId !== meId && globalThis.OneLineSound) {
                 globalThis.OneLineSound.play();
             }
@@ -666,6 +684,8 @@ const initChat = async (root) => {
             updatePresence(ev.online || []);
         } else if (ev.type === 'typing') {
             handleTyping(ev.participant, ev.typing);
+        } else if (ev.type === 'joined' && ev.participant) {
+            addSystemNote(`${ev.participant.displayName} joined the chat`);
         }
     };
 
@@ -793,6 +813,19 @@ const initChat = async (root) => {
             typingIdleTimer = setTimeout(stopTyping, TYPING_IDLE_MS);
         });
 
+        const MAX_INPUT_HEIGHT = 140;
+        const autoGrowInput = () => {
+            sendInputEl.style.height = 'auto';
+            sendInputEl.style.height = Math.min(sendInputEl.scrollHeight, MAX_INPUT_HEIGHT) + 'px';
+        };
+        sendInputEl.addEventListener('input', autoGrowInput);
+        sendInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendFormEl.requestSubmit();
+            }
+        });
+
         sendFormEl.addEventListener('submit', async (e) => {
             e.preventDefault();
             const plaintext = sendInputEl.value.trim();
@@ -814,6 +847,7 @@ const initChat = async (root) => {
             });
             stopTyping();
             sendInputEl.value = '';
+            autoGrowInput();
             sendInputEl.focus();
         });
 

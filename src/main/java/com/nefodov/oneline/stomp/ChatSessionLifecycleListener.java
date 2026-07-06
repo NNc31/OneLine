@@ -2,7 +2,9 @@ package com.nefodov.oneline.stomp;
 
 import com.nefodov.oneline.chat.ChatParticipantService;
 import com.nefodov.oneline.chat.ChatSession;
+import com.nefodov.oneline.chat.ParticipantJoinedEvent;
 import com.nefodov.oneline.chat.PresenceService;
+import com.nefodov.oneline.chat.dto.ParticipantView;
 import com.nefodov.oneline.security.MagicLinkAuthentication;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -50,6 +52,11 @@ public class ChatSessionLifecycleListener {
             presenceService.markOffline(s.chat().getId(), s.participant().getId());
             broadcastPresence(s.chat().getId());
         });
+    }
+
+    @EventListener
+    public void onParticipantJoined(ParticipantJoinedEvent event) {
+        broadcaster.broadcastEvent(event.chatId(), ChatEvent.joined(new ParticipantView(event.participantId(), event.displayName())));
     }
 
     private void broadcastPresence(Long chatId) {

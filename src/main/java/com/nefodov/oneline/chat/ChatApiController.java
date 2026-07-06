@@ -12,6 +12,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
@@ -36,6 +37,7 @@ public class ChatApiController {
     private final PresenceService presenceService;
     private final MeterRegistry meterRegistry;
     private final OneLineProperties properties;
+    private final ApplicationEventPublisher eventPublisher;
 
     @GetMapping("/{publicId}")
     public ChatMetaResponse meta(@PathVariable("publicId") UUID publicId,
@@ -61,6 +63,7 @@ public class ChatApiController {
         enforceRateLimit(BUCKET_JOIN, httpRequest);
 
         ChatParticipantService.JoinedParticipant joined = participantService.join(chat, request.displayName());
+        eventPublisher.publishEvent(new ParticipantJoinedEvent(chat.getId(), joined.participant().getId(), joined.participant().getDisplayName()));
         return ResponseEntity.ok()
                 .body(new JoinChatResponse(chat.getId(), new ParticipantView(joined.participant().getId(), joined.participant().getDisplayName()), joined.sessionToken()));
     }

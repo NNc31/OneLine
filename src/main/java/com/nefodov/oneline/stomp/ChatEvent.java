@@ -13,4 +13,8 @@ public record ChatEvent(String type, List<ParticipantView> online, ParticipantVi
     public static ChatEvent typing(ParticipantView participant, boolean typing) {
         return new ChatEvent("typing", null, participant, typing);
     }
+
+    public static ChatEvent joined(ParticipantView participant) {
+        return new ChatEvent("joined", null, participant, false);
+    }
 }
