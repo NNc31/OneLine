@@ -4,7 +4,6 @@ import com.nefodov.oneline.chat.ChatParticipantService;
 import com.nefodov.oneline.chat.ChatSession;
 import com.nefodov.oneline.chat.ParticipantJoinedEvent;
 import com.nefodov.oneline.chat.PresenceService;
-import com.nefodov.oneline.chat.dto.ParticipantView;
 import com.nefodov.oneline.security.MagicLinkAuthentication;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PostConstruct;
@@ -56,7 +55,7 @@ public class ChatSessionLifecycleListener {
 
     @EventListener
     public void onParticipantJoined(ParticipantJoinedEvent event) {
-        broadcaster.broadcastEvent(event.chatId(), ChatEvent.joined(new ParticipantView(event.participantId(), event.displayName())));
+        broadcaster.broadcast(event.chatId(), event.message());
     }
 
     private void broadcastPresence(Long chatId) {

@@ -1,6 +1,7 @@
 package com.nefodov.oneline.message;
 
 import com.nefodov.oneline.chat.Chat;
+import com.nefodov.oneline.chat.ChatParticipant;
 import com.nefodov.oneline.chat.ChatSession;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Limit;
@@ -25,6 +26,17 @@ public class MessageService {
         validateContent(content);
         Chat chat = session.chat();
         return messageRepository.findByChatAndClientMessageId(chat, clientMessageId).orElseGet(() -> persist(session, clientMessageId, content));
+    }
+
+    @Transactional
+    public Message createJoinNotice(Chat chat, ChatParticipant participant) {
+        Message message = new Message();
+        message.setChat(chat);
+        message.setParticipant(participant);
+        message.setClientMessageId(UUID.randomUUID());
+        message.setContent(new byte[0]);
+        message.setType("joined");
+        return messageRepository.save(message);
     }
 
     @Transactional

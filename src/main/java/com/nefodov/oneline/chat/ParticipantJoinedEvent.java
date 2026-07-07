@@ -1,4 +1,6 @@
 package com.nefodov.oneline.chat;
 
-public record ParticipantJoinedEvent(Long chatId, Long participantId, String displayName) {
+import com.nefodov.oneline.message.dto.MessageResponse;
+
+public record ParticipantJoinedEvent(Long chatId, MessageResponse message) {
 }

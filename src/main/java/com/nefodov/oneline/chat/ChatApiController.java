@@ -63,7 +63,8 @@ public class ChatApiController {
         enforceRateLimit(BUCKET_JOIN, httpRequest);
 
         ChatParticipantService.JoinedParticipant joined = participantService.join(chat, request.displayName());
-        eventPublisher.publishEvent(new ParticipantJoinedEvent(chat.getId(), joined.participant().getId(), joined.participant().getDisplayName()));
+        Message notice = messageService.createJoinNotice(chat, joined.participant());
+        eventPublisher.publishEvent(new ParticipantJoinedEvent(chat.getId(), MessageResponse.from(notice)));
         return ResponseEntity.ok()
                 .body(new JoinChatResponse(chat.getId(), new ParticipantView(joined.participant().getId(), joined.participant().getDisplayName()), joined.sessionToken()));
     }
@@ -108,13 +109,7 @@ public class ChatApiController {
     }
 
     private MessageResponse toResponse(Message stored) {
-        return new MessageResponse(
-                stored.getId(),
-                stored.getParticipant().getId(),
-                stored.getParticipant().getDisplayName(),
-                stored.getContent(),
-                stored.getCreatedAt()
-        );
+        return MessageResponse.from(stored);
     }
 
     private void enforceRateLimit(String bucket, HttpServletRequest request) {

@@ -44,13 +44,7 @@ public class ChatMessagingController {
         }
         Message stored = messageService.send(session, request.clientMessageId(), request.content());
         participantService.touch(session.participant());
-        broadcaster.broadcast(chatId, new MessageResponse(
-                stored.getId(),
-                stored.getParticipant().getId(),
-                stored.getParticipant().getDisplayName(),
-                stored.getContent(),
-                stored.getCreatedAt()
-        ));
+        broadcaster.broadcast(chatId, MessageResponse.from(stored));
         meterRegistry.counter("oneline.messages.sent").increment();
     }
 

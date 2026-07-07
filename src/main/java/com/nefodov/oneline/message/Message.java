@@ -35,6 +35,9 @@ public class Message {
     @Column(nullable = false)
     private byte[] content;
 
+    @Column(nullable = false)
+    private String type = "chat";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

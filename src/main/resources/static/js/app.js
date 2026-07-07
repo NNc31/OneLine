@@ -472,15 +472,19 @@ const initChat = async (root) => {
     const isNearBottom = () => messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < NEAR_BOTTOM_PX;
     const scrollToBottom = () => { messagesEl.scrollTop = messagesEl.scrollHeight; };
 
-    const addSystemNote = (text) => {
-        const stick = isNearBottom();
+    const buildSystemNoteEl = (m) => {
+        if (seenMessageIds.has(m.id)) {
+            return null;
+        }
+        seenMessageIds.add(m.id);
+        if (messageTtlMs != null && new Date(m.createdAt).getTime() + messageTtlMs - Date.now() <= 0) {
+            return null;
+        }
         const li = document.createElement('li');
         li.className = 'system-note';
-        li.textContent = text;
-        messagesEl.appendChild(li);
-        if (stick) {
-            scrollToBottom();
-        }
+        li.dataset.messageId = String(m.id);
+        li.textContent = `${m.displayName} joined the chat`;
+        return li;
     };
 
     const loadOlder = async () => {
@@ -506,6 +510,13 @@ const initChat = async (root) => {
             const prevTop = messagesEl.scrollTop;
             const fragment = document.createDocumentFragment();
             for (const m of batch.slice().reverse()) {
+                if (m.type === 'joined') {
+                    const li = buildSystemNoteEl(m);
+                    if (li) {
+                        fragment.appendChild(li);
+                    }
+                    continue;
+                }
                 try {
                     const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
                     const resolved = await resolveMessage(m, plaintext);
@@ -537,6 +548,17 @@ const initChat = async (root) => {
     });
 
     const decryptAndRender = async (m) => {
+        if (m.type === 'joined') {
+            const stick = isNearBottom();
+            const li = buildSystemNoteEl(m);
+            if (li) {
+                messagesEl.appendChild(li);
+                if (stick) {
+                    scrollToBottom();
+                }
+            }
+            return;
+        }
         try {
             const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
             const resolved = await resolveMessage(m, plaintext);
@@ -600,6 +622,13 @@ const initChat = async (root) => {
             }
             const history = await resp.json();
             for (const m of history.slice().reverse()) {
+                if (m.type === 'joined') {
+                    const li = buildSystemNoteEl(m);
+                    if (li) {
+                        messagesEl.appendChild(li);
+                    }
+                    continue;
+                }
                 try {
                     const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
                     const resolved = await resolveMessage(m, plaintext);
@@ -684,8 +713,6 @@ const initChat = async (root) => {
             updatePresence(ev.online || []);
         } else if (ev.type === 'typing') {
             handleTyping(ev.participant, ev.typing);
-        } else if (ev.type === 'joined' && ev.participant) {
-            addSystemNote(`${ev.participant.displayName} joined the chat`);
         }
     };
 

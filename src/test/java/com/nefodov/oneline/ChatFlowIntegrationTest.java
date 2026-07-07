@@ -82,12 +82,14 @@ class ChatFlowIntegrationTest extends AbstractWebIntegrationTest {
         String body = String.format("{\"clientMessageId\":\"%s\",\"content\":\"%s\"}", clientMessageId, contentBase64);
         ws.send(sendHeaders, body.getBytes(StandardCharsets.UTF_8));
 
-        List<Map<String, Object>> history = awaitHistory(chat.publicId(), chat.token(), sessionToken, 1);
+        List<Map<String, Object>> history = awaitHistory(chat.publicId(), chat.token(), sessionToken, 2);
         ws.disconnect();
-
-        assertEquals(1, history.size());
+        assertEquals(2, history.size());
         assertEquals(contentBase64, history.getFirst().get("content"));
         assertEquals("Maelle", history.getFirst().get("displayName"));
+        assertEquals("chat", history.getFirst().get("type"));
+        assertEquals("joined", history.get(1).get("type"));
+        assertEquals("Maelle", history.get(1).get("displayName"));
     }
 
     @Test
