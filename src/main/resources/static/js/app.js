@@ -395,6 +395,51 @@ const initChat = async (root) => {
         body.appendChild(btn);
     };
 
+    const LINK_TOKEN_REGEX = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+
+    const buildLinkEl = (url, text, masked) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.textContent = text;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        if (masked) {
+            a.title = url;
+            a.addEventListener('click', (e) => {
+                if (!globalThis.confirm(`Open link?\n${url}`)) {
+                    e.preventDefault();
+                }
+            });
+        }
+        return a;
+    };
+
+    const renderTextWithLinks = (el, text) => {
+        let last = 0;
+        for (const match of text.matchAll(LINK_TOKEN_REGEX)) {
+            let consumed = match[0];
+            let link;
+            if (match[2]) {
+                link = buildLinkEl(match[2], match[1], true);
+            } else {
+                const url = match[3].replace(/[.,!?;:)\]]+$/, '');
+                if (!/^https?:\/\/\S/.test(url)) {
+                    continue;
+                }
+                consumed = url;
+                link = buildLinkEl(url, url, false);
+            }
+            if (match.index > last) {
+                el.appendChild(document.createTextNode(text.slice(last, match.index)));
+            }
+            el.appendChild(link);
+            last = match.index + consumed.length;
+        }
+        if (last < text.length) {
+            el.appendChild(document.createTextNode(text.slice(last)));
+        }
+    };
+
     const buildAuthorshipBadge = (status) => {
         if (status === 'unsigned') {
             return null;
@@ -448,7 +493,7 @@ const initChat = async (root) => {
         if (filePayload) {
             renderFileBody(li, bodyEl, filePayload);
         } else {
-            bodyEl.textContent = body;
+            renderTextWithLinks(bodyEl, body);
         }
 
         li.append(author, time, bodyEl);
@@ -853,6 +898,24 @@ const initChat = async (root) => {
                 e.preventDefault();
                 sendFormEl.requestSubmit();
             }
+        });
+        sendInputEl.addEventListener('paste', (e) => {
+            const start = sendInputEl.selectionStart;
+            const end = sendInputEl.selectionEnd;
+            if (start == null || end == null || start === end) {
+                return;
+            }
+            const pasted = (e.clipboardData?.getData('text') || '').trim();
+            if (!/^https?:\/\/\S+$/.test(pasted) || pasted.includes(')')) {
+                return;
+            }
+            const selected = sendInputEl.value.slice(start, end);
+            if (selected.includes(']') || selected.includes('\n')) {
+                return;
+            }
+            e.preventDefault();
+            sendInputEl.setRangeText(`[${selected}](${pasted})`, start, end, 'end');
+            sendInputEl.dispatchEvent(new Event('input'));
         });
 
         sendFormEl.addEventListener('submit', async (e) => {

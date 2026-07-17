@@ -524,6 +524,14 @@ body.chat-page {
     word-break: break-word;
 }
 
+.message .body a {
+    color: var(--accent);
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+}
+
+.message.mine .body a { color: var(--mine-text); }
+
 .message.mine {
     align-self: flex-end;
     background: var(--mine);
