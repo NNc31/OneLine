@@ -461,7 +461,7 @@ body.chat-page {
     overscroll-behavior: contain;
     list-style: none;
     margin: 0;
-    padding: 16px 0;
+    padding: 16px 6px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -508,12 +508,87 @@ body.chat-page {
 .message .authorship.verified { color: var(--online); }
 .message .authorship.warn { color: var(--error); }
 
-.message time {
+.message .msg-meta {
     grid-column: 2;
     grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.message time {
     color: var(--muted);
     font-size: 12px;
     white-space: nowrap;
+}
+
+.message .reply-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: var(--muted);
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity 120ms ease, color 120ms ease;
+}
+
+.message .reply-btn svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
+.message .reply-btn:hover { opacity: 1; color: var(--text); }
+.message.mine .reply-btn { color: rgba(255, 255, 255, 0.8); }
+.message.mine .reply-btn:hover { color: var(--mine-text); }
+
+.message .quote {
+    display: block;
+    margin-bottom: 6px;
+    padding: 4px 8px;
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    background: var(--surface-2);
+    cursor: pointer;
+    font-size: 13px;
+    white-space: normal;
+}
+
+.message .quote:hover { filter: brightness(1.08); }
+
+.message .quote-author {
+    display: block;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.message .quote-snippet {
+    display: block;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.message.mine .quote {
+    border-left-color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.message.mine .quote-author { color: var(--mine-text); }
+.message.mine .quote-snippet { color: rgba(255, 255, 255, 0.85); }
+
+.message.highlighted {
+    animation: msg-highlight 5s ease-out;
+}
+
+@keyframes msg-highlight {
+    0%, 60% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), var(--shadow); }
+    100% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px transparent, var(--shadow); }
 }
 
 .message .body {
@@ -542,6 +617,73 @@ body.chat-page {
 .message.mine .author { color: rgba(255, 255, 255, 0.8); }
 .message.mine .body { color: var(--mine-text); }
 .message.mine time { color: rgba(255, 255, 255, 0.7); }
+
+.scroll-bottom {
+    position: fixed;
+    right: 24px;
+    bottom: 96px;
+    z-index: 6;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: color 120ms ease, border-color 120ms ease;
+}
+
+.scroll-bottom:hover { color: var(--text); border-color: var(--text); }
+.scroll-bottom svg { width: 18px; height: 18px; display: block; }
+
+.reply-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: var(--container);
+    margin: 0 auto;
+    width: 100%;
+    padding: 8px 24px;
+    font-size: 13px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+}
+
+.reply-bar-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.reply-bar-label { color: var(--muted); }
+.reply-bar-label b { color: var(--accent); }
+
+.reply-bar-snippet {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.reply-cancel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.reply-cancel:hover { color: var(--text); border-color: var(--text); }
+.reply-cancel svg { width: 14px; height: 14px; display: block; }
 
 .system-note {
     align-self: center;

@@ -23,6 +23,11 @@ const initChat = async (root) => {
     const uploadProgressLabelEl = document.getElementById('upload-progress-label');
     const uploadProgressFillEl = document.getElementById('upload-progress-fill');
     const uploadCancelEl = document.getElementById('upload-cancel');
+    const scrollBottomEl = document.getElementById('scroll-bottom');
+    const replyBarEl = document.getElementById('reply-bar');
+    const replyBarAuthorEl = document.getElementById('reply-bar-author');
+    const replyBarSnippetEl = document.getElementById('reply-bar-snippet');
+    const replyCancelEl = document.getElementById('reply-cancel');
     const lightboxEl = document.getElementById('lightbox');
     const lightboxImgEl = lightboxEl ? lightboxEl.querySelector('img') : null;
 
@@ -200,6 +205,8 @@ const initChat = async (root) => {
     const MAX_TIMEOUT_MS = 2147483647;
     const FILE_MARKER_V1 = 'file/v1';
     const FILE_MARKER_V2 = 'file/v2';
+    const REPLY_MARKER = 'reply/v1';
+    const SNIPPET_MAX = 100;
     const MAX_FILE_BYTES = 1024 * 1024 * 1024;
     const CHUNK_PLAIN_BYTES = 4 * 1024 * 1024;
     const CHUNK_OVERHEAD_BYTES = 1 + 12 + 16;
@@ -231,16 +238,32 @@ const initChat = async (root) => {
         }
     };
 
-    const parseFilePayload = (text) => {
+    const parsePayload = (text) => {
         try {
             const obj = JSON.parse(text);
-            if (obj?.k === FILE_MARKER_V1 || obj?.k === FILE_MARKER_V2) {
+            if (obj?.k === FILE_MARKER_V1 || obj?.k === FILE_MARKER_V2 || obj?.k === REPLY_MARKER) {
                 return obj;
             }
             return null;
         } catch {
             return null;
         }
+    };
+
+    const isFilePayload = (payload) => payload?.k === FILE_MARKER_V1 || payload?.k === FILE_MARKER_V2;
+
+    const snippetOf = (body) => {
+        const payload = parsePayload(body);
+        let text;
+        if (isFilePayload(payload)) {
+            text = payload.name || 'attachment';
+        } else if (payload?.k === REPLY_MARKER) {
+            text = payload.text || '';
+        } else {
+            text = body;
+        }
+        text = String(text).replace(/\s+/g, ' ').trim();
+        return text.length > SNIPPET_MAX ? text.slice(0, SNIPPET_MAX) + '...' : text;
     };
 
     const humanizeSize = (bytes) => {
@@ -365,7 +388,7 @@ const initChat = async (root) => {
                 img.addEventListener('click', () => openLightbox(url, payload.name));
             }).catch((e) => {
                 console.error('Attachment load failed', e);
-                body.textContent = '⚠ attachment unavailable';
+                body.textContent = '[Attachment unavailable]';
             });
             return;
         }
@@ -440,6 +463,128 @@ const initChat = async (root) => {
         }
     };
 
+    let replyTo = null;
+
+    const renderReplyBar = () => {
+        if (!replyBarEl) {
+            return;
+        }
+        if (!replyTo) {
+            replyBarEl.hidden = true;
+            return;
+        }
+        replyBarAuthorEl.textContent = replyTo.author;
+        replyBarSnippetEl.textContent = replyTo.snippet;
+        replyBarEl.hidden = false;
+    };
+
+    const startReply = (id, author, snippet) => {
+        replyTo = { id, author, snippet };
+        renderReplyBar();
+        sendInputEl.focus();
+    };
+
+    const cancelReply = () => {
+        replyTo = null;
+        renderReplyBar();
+    };
+
+    if (replyCancelEl) {
+        replyCancelEl.addEventListener('click', cancelReply);
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && replyTo) {
+            cancelReply();
+        }
+    });
+
+    let clearHighlight = null;
+
+    const highlightMessage = (el) => {
+        if (clearHighlight) {
+            clearHighlight();
+        }
+        el.classList.remove('highlighted');
+        void el.offsetWidth;
+        el.classList.add('highlighted');
+        const onScroll = () => clear();
+        const timer = setTimeout(() => clear(), 5000);
+        function clear() {
+            clearTimeout(timer);
+            messagesEl.removeEventListener('scroll', onScroll);
+            el.classList.remove('highlighted');
+            clearHighlight = null;
+        }
+
+        setTimeout(() => {
+            if (clearHighlight === clear) {
+                messagesEl.addEventListener('scroll', onScroll, { once: true });
+            }
+        }, 800);
+        clearHighlight = clear;
+    };
+
+    const jumpToMessage = (id) => {
+        const target = messagesEl.querySelector(`[data-message-id="${id}"]`);
+        if (!target) {
+            setStatus(statusEl.dataset.state || 'online', 'Original message is not loaded');
+            return;
+        }
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        highlightMessage(target);
+    };
+
+    const buildQuoteEl = (payload) => {
+        const quote = document.createElement('span');
+        quote.className = 'quote';
+        quote.setAttribute('role', 'button');
+        quote.tabIndex = 0;
+        quote.title = 'Go to the original message';
+
+        const author = document.createElement('span');
+        author.className = 'quote-author';
+        author.textContent = payload.author || 'Unknown';
+
+        const snippet = document.createElement('span');
+        snippet.className = 'quote-snippet';
+        snippet.textContent = payload.snippet || '';
+
+        quote.append(author, snippet);
+        const go = () => jumpToMessage(payload.to);
+        quote.addEventListener('click', go);
+        quote.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                go();
+            }
+        });
+        return quote;
+    };
+
+    const buildReplyButton = (m, body) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'reply-btn';
+        btn.title = 'Reply';
+        btn.setAttribute('aria-label', 'Reply to this message');
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        poly.setAttribute('points', '9 14 4 9 9 4');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M20 20v-7a4 4 0 0 0-4-4H4');
+        svg.append(poly, path);
+        btn.appendChild(svg);
+        btn.addEventListener('click', () => startReply(m.id, m.displayName, snippetOf(body)));
+        return btn;
+    };
+
     const buildAuthorshipBadge = (status) => {
         if (status === 'unsigned') {
             return null;
@@ -487,16 +632,25 @@ const initChat = async (root) => {
         time.dateTime = m.createdAt;
         time.textContent = formatTime(m.createdAt);
 
+        const meta = document.createElement('span');
+        meta.className = 'msg-meta';
+        meta.append(time, buildReplyButton(m, body));
+
         const bodyEl = document.createElement('span');
         bodyEl.className = 'body';
-        const filePayload = parseFilePayload(body);
-        if (filePayload) {
-            renderFileBody(li, bodyEl, filePayload);
+        const payload = parsePayload(body);
+        if (payload?.to) {
+            bodyEl.appendChild(buildQuoteEl(payload));
+        }
+        if (isFilePayload(payload)) {
+            renderFileBody(li, bodyEl, payload);
+        } else if (payload?.k === REPLY_MARKER) {
+            renderTextWithLinks(bodyEl, payload.text || '');
         } else {
             renderTextWithLinks(bodyEl, body);
         }
 
-        li.append(author, time, bodyEl);
+        li.append(author, meta, bodyEl);
         if (remainingMs != null && remainingMs <= MAX_TIMEOUT_MS) {
             setTimeout(() => {
                 revokeUrls(li);
@@ -516,6 +670,19 @@ const initChat = async (root) => {
     const NEAR_BOTTOM_PX = 120;
     const isNearBottom = () => messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < NEAR_BOTTOM_PX;
     const scrollToBottom = () => { messagesEl.scrollTop = messagesEl.scrollHeight; };
+
+    const updateScrollButton = () => {
+        if (scrollBottomEl) {
+            scrollBottomEl.hidden = isNearBottom();
+        }
+    };
+
+    if (scrollBottomEl) {
+        scrollBottomEl.addEventListener('click', () => {
+            messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+        });
+    }
+    messagesEl.addEventListener('scroll', updateScrollButton);
 
     const buildSystemNoteEl = (m) => {
         if (seenMessageIds.has(m.id)) {
@@ -601,6 +768,7 @@ const initChat = async (root) => {
                 if (stick) {
                     scrollToBottom();
                 }
+                updateScrollButton();
             }
             return;
         }
@@ -613,6 +781,7 @@ const initChat = async (root) => {
             if (stick) {
                 scrollToBottom();
             }
+            updateScrollButton();
             if (isNew && m.participantId !== meId && globalThis.OneLineSound) {
                 globalThis.OneLineSound.play();
             }
@@ -687,6 +856,7 @@ const initChat = async (root) => {
             }
             noMoreHistory = history.length < HISTORY_PAGE;
             messagesEl.scrollTop = messagesEl.scrollHeight;
+            updateScrollButton();
         } catch (err) {
             console.error(err);
             setStatus('error', 'Failed to load history');
@@ -925,9 +1095,12 @@ const initChat = async (root) => {
                 return;
             }
             const id = crypto.randomUUID();
+            const bodyToSend = replyTo
+                ? JSON.stringify({ k: REPLY_MARKER, to: replyTo.id, author: replyTo.author, snippet: replyTo.snippet, text: plaintext })
+                : plaintext;
             let ciphertextBase64;
             try {
-                const envelope = signPriv ? await buildSignedEnvelope(id, plaintext) : plaintext;
+                const envelope = signPriv ? await buildSignedEnvelope(id, bodyToSend) : bodyToSend;
                 ciphertextBase64 = await OneLineCrypto.encrypt(cryptoKey, envelope);
             } catch (err) {
                 console.error('Encrypt failed', err);
@@ -938,6 +1111,7 @@ const initChat = async (root) => {
                 body: JSON.stringify({ clientMessageId: id, content: ciphertextBase64 }),
             });
             stopTyping();
+            cancelReply();
             sendInputEl.value = '';
             autoGrowInput();
             sendInputEl.focus();
@@ -1000,7 +1174,7 @@ const initChat = async (root) => {
                     reason = parsed.error;
                 }
             } catch {
-                // body wasn't JSON
+
             }
             throw new Error(reason);
         };
@@ -1032,7 +1206,9 @@ const initChat = async (root) => {
                 size: file.size,
                 key: OneLineCrypto.base64Encode(fileKeyRaw),
                 chunkCount,
+                ...(replyTo ? { to: replyTo.id, author: replyTo.author, snippet: replyTo.snippet } : {}),
             });
+            cancelReply();
             const messageId = crypto.randomUUID();
             const envelope = signPriv ? await buildSignedEnvelope(messageId, payload) : payload;
             const content = await OneLineCrypto.encrypt(cryptoKey, envelope);

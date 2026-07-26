@@ -82,6 +82,24 @@
     <div class="bar"><span id="upload-progress-fill"></span></div>
     <button type="button" id="upload-cancel" class="cancel">Cancel</button>
 </div>
+<button type="button" id="scroll-bottom" class="scroll-bottom" hidden aria-label="Scroll to latest messages" title="Scroll to latest messages">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <polyline points="19 12 12 19 5 12"></polyline>
+    </svg>
+</button>
+<div id="reply-bar" class="reply-bar" hidden>
+    <span class="reply-bar-text">
+        <span class="reply-bar-label">Replying to <b id="reply-bar-author"></b></span>
+        <span id="reply-bar-snippet" class="reply-bar-snippet"></span>
+    </span>
+    <button type="button" id="reply-cancel" class="reply-cancel" aria-label="Cancel reply" title="Cancel reply">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+    </button>
+</div>
 <form id="send-form" class="send" autocomplete="off" hidden>
     <input id="attach-input" type="file" hidden aria-label="Attach a file">
     <button type="button" id="attach-btn" class="attach" aria-label="Attach a file (up to 100 MB)" title="Attach a file (up to 100 MB)">
