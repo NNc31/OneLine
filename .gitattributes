@@ -1,3 +1,5 @@
 /gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
+
+src/main/resources/static/js/stomp.umd.min.js linguist-vendored

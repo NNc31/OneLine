@@ -41,7 +41,7 @@ public class StorageConfig {
                 .build();
     }
 
-    private void ensureBucket(MinioClient client, String bucket) {
+    void ensureBucket(MinioClient client, String bucket) {
         try {
             boolean exists = client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
             if (!exists) {
@@ -53,7 +53,7 @@ public class StorageConfig {
         }
     }
 
-    private void applyLifecycle(MinioClient client, OneLineProperties properties) {
+    void applyLifecycle(MinioClient client, OneLineProperties properties) {
         String bucket = properties.storage().bucket();
         try {
             int days = (int) Math.max(1, properties.attachments().ttl().toDays() + 1);

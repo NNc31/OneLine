@@ -395,7 +395,7 @@ const initChat = async (root) => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'attachment-file';
-        btn.textContent = `⬇ ${payload.name} (${humanizeSize(payload.size)})`;
+        btn.textContent = `${payload.name} (${humanizeSize(payload.size)})`;
         btn.addEventListener('click', async () => {
             btn.disabled = true;
             try {
