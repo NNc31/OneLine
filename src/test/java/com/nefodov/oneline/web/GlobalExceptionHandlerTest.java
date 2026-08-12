@@ -18,6 +18,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
 
 class GlobalExceptionHandlerTest {
 
@@ -66,10 +67,10 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("Validation errors report the first field error")
     void handlesValidationFirstFieldError() {
-        BindingResult bindingResult = Mockito.mock(BindingResult.class);
+        BindingResult bindingResult = mock(BindingResult.class);
         FieldError fieldError = new FieldError("obj", "displayName", "must not be blank");
         Mockito.when(bindingResult.getFieldErrors()).thenReturn(List.of(fieldError));
-        MethodArgumentNotValidException ex = Mockito.mock(MethodArgumentNotValidException.class);
+        MethodArgumentNotValidException ex = mock(MethodArgumentNotValidException.class);
         Mockito.when(ex.getBindingResult()).thenReturn(bindingResult);
         ResponseEntity<Map<String, String>> resp = handler.handleValidation(ex);
         assertEquals(HttpStatus.BAD_REQUEST, resp.getStatusCode());
@@ -79,9 +80,9 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("Validation falls back to a generic message without field errors")
     void handlesValidationFallback() {
-        BindingResult bindingResult = Mockito.mock(BindingResult.class);
+        BindingResult bindingResult = mock(BindingResult.class);
         Mockito.when(bindingResult.getFieldErrors()).thenReturn(List.of());
-        MethodArgumentNotValidException ex = Mockito.mock(MethodArgumentNotValidException.class);
+        MethodArgumentNotValidException ex = mock(MethodArgumentNotValidException.class);
         Mockito.when(ex.getBindingResult()).thenReturn(bindingResult);
         ResponseEntity<Map<String, String>> resp = handler.handleValidation(ex);
         assertEquals(HttpStatus.BAD_REQUEST, resp.getStatusCode());

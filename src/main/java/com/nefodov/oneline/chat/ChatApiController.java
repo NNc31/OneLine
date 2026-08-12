@@ -103,7 +103,7 @@ public class ChatApiController {
         }
         try {
             return chatService.findActive(publicId, chatToken);
-        } catch (NotFoundException e) {
+        } catch (NotFoundException _) {
             return chatService.findByPublicId(publicId);
         }
     }

@@ -11,12 +11,13 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
 
 class OneLineStompErrorHandlerTest {
 
     private final OneLineStompErrorHandler handler = new OneLineStompErrorHandler();
 
-    private final Message<byte[]> clientMessage = Mockito.mock(Message.class);
+    private final Message<byte[]> clientMessage = mock(Message.class);
 
     @Test
     @DisplayName("Sets exception message into a STOMP ERROR frame body")

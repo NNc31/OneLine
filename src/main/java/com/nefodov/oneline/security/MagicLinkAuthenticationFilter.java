@@ -50,7 +50,7 @@ public class MagicLinkAuthenticationFilter extends OncePerRequestFilter {
         Chat chat;
         try {
             chat = chatService.findActive(publicId, chatToken);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException _) {
             return Optional.empty();
         }
         return participantService.resolveBySession(sessionToken)
@@ -65,7 +65,7 @@ public class MagicLinkAuthenticationFilter extends OncePerRequestFilter {
         }
         try {
             return UUID.fromString(matcher.group("publicId"));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException _) {
             return null;
         }
     }

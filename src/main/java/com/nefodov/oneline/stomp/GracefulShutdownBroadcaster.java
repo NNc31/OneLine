@@ -36,7 +36,7 @@ public class GracefulShutdownBroadcaster implements SmartLifecycle {
             log.info("Broadcasting shutdown notice to STOMP clients");
             messagingTemplate.convertAndSend(SYSTEM_EVENTS_TOPIC, (Object) Map.of("type", "shutdown"));
             Thread.sleep(NOTICE_DRAIN_MS);
-        } catch (InterruptedException e) {
+        } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
         } catch (RuntimeException e) {
             log.warn("Failed to broadcast shutdown notice", e);

@@ -505,7 +505,7 @@ const initChat = async (root) => {
             clearHighlight();
         }
         el.classList.remove('highlighted');
-        void el.offsetWidth;
+        el.offsetWidth;
         el.classList.add('highlighted');
         const onScroll = () => clear();
         const timer = setTimeout(() => clear(), 5000);
