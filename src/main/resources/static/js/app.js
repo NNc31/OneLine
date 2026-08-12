@@ -418,7 +418,7 @@ const initChat = async (root) => {
         body.appendChild(btn);
     };
 
-    const LINK_TOKEN_REGEX = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+    const LINK_TOKEN_REGEX = /\[([^\]\n]{1,200})\]\((https?:\/\/[^\s)]{1,2000})\)|(https?:\/\/[^\s]{1,2000})/g;
 
     const buildLinkEl = (url, text, masked) => {
         const a = document.createElement('a');
@@ -445,7 +445,7 @@ const initChat = async (root) => {
             if (match[2]) {
                 link = buildLinkEl(match[2], match[1], true);
             } else {
-                const url = match[3].replace(/[.,!?;:)\]]+$/, '');
+                const url = match[3].replace(/[.,!?;:)\]]{1,10}$/, '');
                 if (!/^https?:\/\/\S/.test(url)) {
                     continue;
                 }
@@ -505,7 +505,7 @@ const initChat = async (root) => {
             clearHighlight();
         }
         el.classList.remove('highlighted');
-        el.offsetWidth;
+        el.getBoundingClientRect();
         el.classList.add('highlighted');
         const onScroll = () => clear();
         const timer = setTimeout(() => clear(), 5000);
