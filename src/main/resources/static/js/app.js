@@ -1063,11 +1063,20 @@ const initChat = async (root) => {
             sendInputEl.style.overflowY = contentHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden';
         };
         sendInputEl.addEventListener('input', autoGrowInput);
+        const isTouchPrimary = () => globalThis.matchMedia?.('(hover: none) and (pointer: coarse)').matches === true;
+
         sendInputEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendFormEl.requestSubmit();
+            if (e.key !== 'Enter' || e.shiftKey) {
+                return;
             }
+            if (e.isComposing || e.keyCode === 229) {
+                return;
+            }
+            if (isTouchPrimary()) {
+                return;
+            }
+            e.preventDefault();
+            sendFormEl.requestSubmit();
         });
         sendInputEl.addEventListener('paste', (e) => {
             const start = sendInputEl.selectionStart;
