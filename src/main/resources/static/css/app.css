@@ -596,7 +596,7 @@ body.chat-page {
     grid-row: 2;
     color: var(--text);
     white-space: pre-wrap;
-    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 .message .body a {
