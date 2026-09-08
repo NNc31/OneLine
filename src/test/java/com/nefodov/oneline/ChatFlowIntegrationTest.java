@@ -93,6 +93,15 @@ class ChatFlowIntegrationTest extends AbstractWebIntegrationTest {
     }
 
     @Test
+    @DisplayName("Actuator is not served on the port that faces the internet")
+    void actuatorIsNotReachableOnTheApplicationPort() {
+        for (String path : List.of("/actuator/health", "/actuator/metrics", "/actuator/prometheus")) {
+            ResponseEntity<String> resp = restTemplate.getForEntity(path, String.class);
+            assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
+        }
+    }
+
+    @Test
     @DisplayName("Joining with an already taken name returns 409")
     void joinWithTakenNameReturns409() {
         CreatedChat chat = createChat();

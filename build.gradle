@@ -91,6 +91,7 @@ sonar {
 tasks.named('test') {
     useJUnitPlatform()
     systemProperty 'user.timezone', 'UTC'
+    systemProperty 'management.server.port', '0'
     finalizedBy tasks.named('jacocoTestReport')
 }
 

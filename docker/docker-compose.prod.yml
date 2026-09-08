@@ -77,6 +77,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?}
       ONELINE_ATTACHMENTS_ENABLED: "${ONELINE_ATTACHMENTS_ENABLED:-true}"
       SERVER_FORWARD_HEADERS_STRATEGY: framework
+    ports:
+      - "127.0.0.1:8081:8081"
     logging: *default-logging
 
   caddy:
