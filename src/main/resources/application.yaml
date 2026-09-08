@@ -28,6 +28,17 @@ spring:
         enabled: ${REDIS_SSL_ENABLED:false}
   lifecycle:
     timeout-per-shutdown-phase: 20s
+  web:
+    resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /**
+      cache:
+        cachecontrol:
+          max-age: 365d
+          cache-public: true
 
 server:
   forward-headers-strategy: framework

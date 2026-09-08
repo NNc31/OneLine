@@ -25,6 +25,7 @@ public class ChatParticipantService {
     @Transactional
     public JoinedParticipant join(Chat chat, String displayName) {
         String normalizedName = normalize(displayName);
+        participantRepository.acquireJoinLock(joinLockKey(chat.getId(), normalizedName));
         Instant activeSince = clock.instant().minus(properties.participant().activityWindow());
         if (participantRepository.existsByChatIdAndDisplayNameAndLastSeenAtAfter(chat.getId(), normalizedName, activeSince)) {
             throw new ConflictException("Display name is taken by an active participant");
@@ -51,6 +52,10 @@ public class ChatParticipantService {
     @Transactional
     public void touch(ChatParticipant participant) {
         participantRepository.touchLastSeen(participant.getId(), clock.instant());
+    }
+
+    private static long joinLockKey(Long chatId, String displayName) {
+        return ((long) chatId.hashCode() << 32) | (displayName.hashCode() & 0xffffffffL);
     }
 
     private String normalize(String displayName) {

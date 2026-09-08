@@ -23,4 +23,7 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
     @Modifying
     @Query("UPDATE ChatParticipant p SET p.lastSeenAt = :now WHERE p.id = :id")
     int touchLastSeen(@Param("id") Long id, @Param("now") Instant now);
+
+    @Query(value = "SELECT 1 FROM (SELECT pg_advisory_xact_lock(:key)) AS lock_taken", nativeQuery = true)
+    int acquireJoinLock(@Param("key") long key);
 }
