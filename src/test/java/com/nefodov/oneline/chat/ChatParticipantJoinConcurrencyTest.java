@@ -58,7 +58,7 @@ class ChatParticipantJoinConcurrencyTest {
                 try {
                     participantService.join(saved, "Alex");
                     return true;
-                } catch (ConflictException e) {
+                } catch (ConflictException _) {
                     return false;
                 }
             }));

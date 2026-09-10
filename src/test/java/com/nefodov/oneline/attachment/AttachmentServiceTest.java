@@ -6,6 +6,7 @@ import com.nefodov.oneline.chat.Chat;
 import com.nefodov.oneline.chat.ChatParticipant;
 import com.nefodov.oneline.chat.ChatSession;
 import com.nefodov.oneline.config.OneLineProperties;
+import com.nefodov.oneline.exception.ConflictException;
 import com.nefodov.oneline.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -181,6 +182,72 @@ class AttachmentServiceTest {
         assertThrows(NotFoundException.class, () -> service.presignDownload(session, 1L));
     }
 
+    @Test
+    @DisplayName("confirm reports the bytes that arrived on top of what the upload declared")
+    void confirmReportsUndeclaredBytes() {
+        Attachment attachment = chunkedAttachment("k0", "k1");
+        attachment.setCiphertextSize(100L);
+        when(repository.findByIdAndChat(1L, session.chat())).thenReturn(Optional.of(attachment));
+        when(storage.objectSize("k0")).thenReturn(OptionalLong.of(250L));
+        when(storage.objectSize("k1")).thenReturn(OptionalLong.of(50L));
+        assertEquals(200L, service.confirm(session, 1L));
+    }
+
+    @Test
+    @DisplayName("confirm reports nothing extra when the upload matches its declaration")
+    void confirmReportsNothingWhenSizesMatch() {
+        Attachment attachment = chunkedAttachment("k0");
+        attachment.setCiphertextSize(120L);
+        when(repository.findByIdAndChat(1L, session.chat())).thenReturn(Optional.of(attachment));
+        when(storage.objectSize("k0")).thenReturn(OptionalLong.of(120L));
+        assertEquals(0L, service.confirm(session, 1L));
+    }
+
+    @Test
+    @DisplayName("discard removes every chunk object and the row behind it")
+    void discardRemovesChunkedAttachment() {
+        Attachment attachment = chunkedAttachment("k0", "k1");
+        when(repository.findByIdAndChat(1L, session.chat())).thenReturn(Optional.of(attachment));
+        service.discard(session, 1L);
+        verify(storage).remove(List.of("k0", "k1"));
+        verify(repository).delete(attachment);
+    }
+
+    @Test
+    @DisplayName("discard removes the single object of a legacy attachment")
+    void discardRemovesLegacyAttachment() {
+        Attachment legacy = legacyAttachment("legacy-key");
+        when(repository.findByIdAndChat(1L, session.chat())).thenReturn(Optional.of(legacy));
+        service.discard(session, 1L);
+        verify(storage).remove(List.of("legacy-key"));
+        verify(repository).delete(legacy);
+    }
+
+    @Test
+    @DisplayName("prepareUpload refuses a chat that already holds its maximum number of attachments")
+    void prepareUploadRejectsChatAtAttachmentLimit() {
+        service = serviceWith(properties(MAX_FILE_SIZE, 2L, 1_000_000L));
+        when(repository.countByChatId(7L)).thenReturn(2L);
+        List<Long> list = List.of(100L);
+        assertThrows(ConflictException.class, () -> service.prepareUpload(session, list));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("prepareUpload refuses an upload that would push the chat past its storage limit")
+    void prepareUploadRejectsChatAtByteLimit() {
+        service = serviceWith(properties(MAX_FILE_SIZE, 3000L, 500L));
+        when(repository.countByChatId(7L)).thenReturn(1L);
+        when(repository.sumCiphertextSizeByChatId(7L)).thenReturn(450L);
+        List<Long> list = List.of(100L);
+        assertThrows(ConflictException.class, () -> service.prepareUpload(session, list));
+        verify(repository, never()).save(any());
+    }
+
+    private AttachmentService serviceWith(OneLineProperties properties) {
+        return new AttachmentService(repository, storage, properties);
+    }
+
     private Attachment chunkedAttachment(String... objectKeys) {
         Attachment attachment = new Attachment();
         attachment.setId(1L);
@@ -218,9 +285,14 @@ class AttachmentServiceTest {
     }
 
     private static OneLineProperties propertiesWithMaxFileSize(long maxFileSize) {
+        return properties(maxFileSize, 3000L, 5368709120L);
+    }
+
+    private static OneLineProperties properties(long maxFileSize, long maxPerChat, long maxBytesPerChat) {
         OneLineProperties.Storage storage = new OneLineProperties.Storage(
                 "http://minio", "http://minio", "ak", "sk", "bucket",
                 Duration.ofMinutes(30), maxFileSize, Duration.ofMinutes(30));
-        return new OneLineProperties(null, null, null, storage, new OneLineProperties.Attachments(true, Duration.ofDays(31), 3000L, 5368709120L));
+        return new OneLineProperties(null, null, null, storage,
+                new OneLineProperties.Attachments(true, Duration.ofDays(31), maxPerChat, maxBytesPerChat));
     }
 }

@@ -1069,7 +1069,7 @@ const initChat = async (root) => {
             if (e.key !== 'Enter' || e.shiftKey) {
                 return;
             }
-            if (e.isComposing || e.keyCode === 229) {
+            if (e.isComposing) {
                 return;
             }
             if (isTouchPrimary()) {
