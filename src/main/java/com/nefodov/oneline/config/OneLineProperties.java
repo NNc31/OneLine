@@ -9,7 +9,7 @@ public record OneLineProperties(Participant participant, RateLimit rateLimit, Re
 
     public record Participant(Duration activityWindow) {}
 
-    public record RateLimit(Bucket createChat, Bucket join, Bucket message, Bucket attachment, Bucket uploadBytes) {
+    public record RateLimit(Bucket createChat, Bucket join, Bucket message, Bucket attachment, Bucket attachmentObjects, Bucket uploadBytes) {
 
         public record Bucket(long capacity, Duration refillPeriod) {}
     }
@@ -18,5 +18,5 @@ public record OneLineProperties(Participant participant, RateLimit rateLimit, Re
 
     public record Storage(String endpoint, String publicEndpoint, String accessKey, String secretKey, String bucket, Duration presignTtl, long maxFileSize, Duration unconfirmedTtl) {}
 
-    public record Attachments(boolean enabled, Duration ttl) {}
+    public record Attachments(boolean enabled, Duration ttl, long maxPerChat, long maxBytesPerChat) {}
 }

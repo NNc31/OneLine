@@ -9,6 +9,7 @@ import com.nefodov.oneline.exception.NotFoundException;
 import com.nefodov.oneline.exception.TooManyRequestsException;
 import com.nefodov.oneline.ratelimit.RateLimiter;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -24,7 +26,9 @@ import java.util.UUID;
 public class AttachmentController {
 
     private static final String BUCKET_ATTACHMENT = "attachment";
+    private static final String BUCKET_ATTACHMENT_OBJECTS = "attachment-objects";
     private static final String BUCKET_UPLOAD_BYTES = "upload-bytes";
+    private static final String QUOTA_MESSAGE = "Daily upload quota exceeded";
 
     private final AttachmentService attachmentService;
     private final RateLimiter rateLimiter;
@@ -32,22 +36,29 @@ public class AttachmentController {
     private final OneLineProperties properties;
 
     @PostMapping
-    public AttachmentUploadResponse prepare(@PathVariable("publicId") UUID publicId, @Valid @RequestBody AttachmentUploadRequest request, @AuthenticationPrincipal ChatSession session) {
+    public AttachmentUploadResponse prepare(@PathVariable("publicId") UUID publicId, @Valid @RequestBody AttachmentUploadRequest request, @AuthenticationPrincipal ChatSession session, HttpServletRequest httpRequest) {
         verifyChat(publicId, session);
         requireUploadEnabled();
-        enforceRateLimit(session);
-        long totalBytes = request.chunks().stream().mapToLong(Long::longValue).sum();
-        enforceByteQuota(session, totalBytes);
+        List<String> keys = quotaKeys(session, httpRequest);
+        enforce(BUCKET_ATTACHMENT, keys, 1L, "Too many uploads");
+        enforce(BUCKET_ATTACHMENT_OBJECTS, keys, request.chunks().size(), QUOTA_MESSAGE);
+        enforce(BUCKET_UPLOAD_BYTES, keys, request.chunks().stream().mapToLong(Long::longValue).sum(), QUOTA_MESSAGE);
         AttachmentUploadResponse response = attachmentService.prepareUpload(session, request.chunks());
         meterRegistry.counter("oneline.attachments.prepared").increment();
         return response;
     }
 
     @PostMapping("/{attachmentId}/confirm")
-    public void confirm(@PathVariable("publicId") UUID publicId, @PathVariable("attachmentId") Long attachmentId, @AuthenticationPrincipal ChatSession session) {
+    public void confirm(@PathVariable("publicId") UUID publicId, @PathVariable("attachmentId") Long attachmentId, @AuthenticationPrincipal ChatSession session, HttpServletRequest httpRequest) {
         verifyChat(publicId, session);
         requireUploadEnabled();
-        attachmentService.confirm(session, attachmentId);
+        long undeclared = attachmentService.confirm(session, attachmentId);
+        try {
+            enforce(BUCKET_UPLOAD_BYTES, quotaKeys(session, httpRequest), undeclared, QUOTA_MESSAGE);
+        } catch (TooManyRequestsException e) {
+            attachmentService.discard(session, attachmentId);
+            throw e;
+        }
         meterRegistry.counter("oneline.attachments.confirmed").increment();
     }
 
@@ -69,17 +80,19 @@ public class AttachmentController {
         }
     }
 
-    private void enforceRateLimit(ChatSession session) {
-        if (!rateLimiter.tryAcquire(BUCKET_ATTACHMENT, String.valueOf(session.participant().getId()))) {
-            meterRegistry.counter("oneline.ratelimit.rejected", "bucket", BUCKET_ATTACHMENT).increment();
-            throw new TooManyRequestsException("Too many uploads");
-        }
+    private static List<String> quotaKeys(ChatSession session, HttpServletRequest request) {
+        return List.of("p:" + session.participant().getId(), "ip:" + request.getRemoteAddr());
     }
 
-    private void enforceByteQuota(ChatSession session, long totalBytes) {
-        if (!rateLimiter.tryAcquire(BUCKET_UPLOAD_BYTES, String.valueOf(session.participant().getId()), totalBytes)) {
-            meterRegistry.counter("oneline.ratelimit.rejected", "bucket", BUCKET_UPLOAD_BYTES).increment();
-            throw new TooManyRequestsException("Daily upload quota exceeded");
+    private void enforce(String bucket, List<String> keys, long tokens, String message) {
+        if (tokens <= 0L) {
+            return;
+        }
+        for (String key : keys) {
+            if (!rateLimiter.tryAcquire(bucket, key, tokens)) {
+                meterRegistry.counter("oneline.ratelimit.rejected", "bucket", bucket).increment();
+                throw new TooManyRequestsException(message);
+            }
         }
     }
 }

@@ -169,7 +169,7 @@ class AttachmentServiceTest {
         AttachmentDownloadResponse response = service.presignDownload(session, 1L);
 
         assertEquals(1, response.chunks().size());
-        assertEquals("get-legacy", response.chunks().get(0).downloadUrl());
+        assertEquals("get-legacy", response.chunks().getFirst().downloadUrl());
     }
 
     @Test
@@ -221,6 +221,6 @@ class AttachmentServiceTest {
         OneLineProperties.Storage storage = new OneLineProperties.Storage(
                 "http://minio", "http://minio", "ak", "sk", "bucket",
                 Duration.ofMinutes(30), maxFileSize, Duration.ofMinutes(30));
-        return new OneLineProperties(null, null, null, storage, null);
+        return new OneLineProperties(null, null, null, storage, new OneLineProperties.Attachments(true, Duration.ofDays(31), 3000L, 5368709120L));
     }
 }

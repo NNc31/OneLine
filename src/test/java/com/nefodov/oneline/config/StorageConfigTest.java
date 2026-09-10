@@ -69,6 +69,6 @@ class StorageConfigTest {
                 Duration.ofMinutes(5),
                 1024L,
                 Duration.ofMinutes(30));
-        return new OneLineProperties(null, null, null, storage, new OneLineProperties.Attachments(true, attachmentTtl));
+        return new OneLineProperties(null, null, null, storage, new OneLineProperties.Attachments(true, attachmentTtl, 3000L, 5368709120L));
     }
 }

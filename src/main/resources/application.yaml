@@ -71,12 +71,17 @@ oneline:
     attachment:
       capacity: 10
       refill-period: PT1M
+    attachment-objects:
+      capacity: 500
+      refill-period: P1D
     upload-bytes:
       capacity: 1073741824
       refill-period: P1D
   attachments:
     enabled: true
     ttl: P31D
+    max-per-chat: 3000
+    max-bytes-per-chat: 5368709120
   storage:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
     public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://localhost:9000}

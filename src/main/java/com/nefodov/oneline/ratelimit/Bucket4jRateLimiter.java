@@ -56,6 +56,7 @@ public class Bucket4jRateLimiter implements RateLimiter {
             case "join" -> limits.join();
             case "message" -> limits.message();
             case "attachment" -> limits.attachment();
+            case "attachment-objects" -> limits.attachmentObjects();
             case "upload-bytes" -> limits.uploadBytes();
             default -> throw new IllegalArgumentException("Unknown rate-limit bucket: " + bucketName);
         };

@@ -16,6 +16,11 @@ public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
 
     Optional<Attachment> findByIdAndChat(Long id, Chat chat);
 
+    long countByChatId(Long chatId);
+
+    @Query("SELECT COALESCE(SUM(a.ciphertextSize), 0) FROM Attachment a WHERE a.chat.id = :chatId")
+    long sumCiphertextSizeByChatId(@Param("chatId") Long chatId);
+
     @Query(value = """
             SELECT a.id FROM attachments a JOIN chats c ON a.chat_id = c.id
             WHERE c.message_ttl_seconds IS NOT NULL AND a.created_at < now() - make_interval(secs => c.message_ttl_seconds)

@@ -4,6 +4,7 @@ import com.nefodov.oneline.attachment.dto.AttachmentDownloadResponse;
 import com.nefodov.oneline.attachment.dto.AttachmentUploadResponse;
 import com.nefodov.oneline.chat.ChatSession;
 import com.nefodov.oneline.config.OneLineProperties;
+import com.nefodov.oneline.exception.ConflictException;
 import com.nefodov.oneline.exception.NotFoundException;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class AttachmentService {
     @Transactional
     public AttachmentUploadResponse prepareUpload(ChatSession session, List<Long> chunkSizes) {
         Attachment attachment = getAttachment(session, chunkSizes);
+        enforceChatCapacity(session, attachment.getCiphertextSize());
 
         List<AttachmentUploadResponse.ChunkUpload> uploads = new ArrayList<>(chunkSizes.size());
         for (int i = 0; i < chunkSizes.size(); i++) {
@@ -59,13 +61,13 @@ public class AttachmentService {
     }
 
     @Transactional
-    public void confirm(ChatSession session, Long attachmentId) {
+    public long confirm(ChatSession session, Long attachmentId) {
         Attachment attachment = require(session, attachmentId);
+        long declared = attachment.getCiphertextSize();
 
         // Process legacy attachment without chunks
         if (attachment.getChunks().isEmpty()) {
-            confirmLegacy(attachment);
-            return;
+            return Math.max(0L, confirmLegacy(attachment) - declared);
         }
 
         long total = 0L;
@@ -86,6 +88,18 @@ public class AttachmentService {
         }
         attachment.setCiphertextSize(total);
         attachment.setConfirmed(true);
+        return Math.max(0L, total - declared);
+    }
+
+    @Transactional
+    public void discard(ChatSession session, Long attachmentId) {
+        Attachment attachment = require(session, attachmentId);
+        List<String> keys = new ArrayList<>(attachment.getChunks().stream().map(AttachmentChunk::getObjectKey).toList());
+        if (attachment.getObjectKey() != null) {
+            keys.add(attachment.getObjectKey());
+        }
+        storage.remove(keys);
+        repository.delete(attachment);
     }
 
     @Transactional(readOnly = true)
@@ -110,7 +124,7 @@ public class AttachmentService {
         return new AttachmentDownloadResponse(chunks);
     }
 
-    private void confirmLegacy(Attachment attachment) {
+    private long confirmLegacy(Attachment attachment) {
         OptionalLong actualSize = storage.objectSize(attachment.getObjectKey());
         if (actualSize.isEmpty()) {
             throw new NotFoundException("Uploaded object not found");
@@ -122,6 +136,18 @@ public class AttachmentService {
         }
         attachment.setCiphertextSize(actualSize.getAsLong());
         attachment.setConfirmed(true);
+        return actualSize.getAsLong();
+    }
+
+    private void enforceChatCapacity(ChatSession session, long incomingBytes) {
+        OneLineProperties.Attachments limits = properties.attachments();
+        Long chatId = session.chat().getId();
+        if (repository.countByChatId(chatId) >= limits.maxPerChat()) {
+            throw new ConflictException("This chat has reached its attachment limit");
+        }
+        if (repository.sumCiphertextSizeByChatId(chatId) + incomingBytes > limits.maxBytesPerChat()) {
+            throw new ConflictException("This chat has reached its storage limit");
+        }
     }
 
     private Attachment require(ChatSession session, Long attachmentId) {
