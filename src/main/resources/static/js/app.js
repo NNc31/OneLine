@@ -1413,8 +1413,10 @@ const initChat = async (root) => {
                     onLimit: finishRecording,
                 });
             } catch (e) {
-                console.error('Microphone unavailable', e);
-                setStatus('error', 'Microphone unavailable - check the browser permission');
+                console.error('Recording could not start', e);
+                setStatus('error', e.stage === 'recorder'
+                    ? `This browser cannot record audio (${e.reason})`
+                    : `Microphone unavailable (${e.reason}) - check the browser permission`);
                 return;
             }
             sendFormEl.hidden = true;

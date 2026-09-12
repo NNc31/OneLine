@@ -35,12 +35,42 @@ globalThis.OneLineVoice = (() => {
         return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
     };
 
+    const failure = (stage, cause) =>
+        Object.assign(new Error(stage), { stage, reason: cause?.name || 'unknown', cause });
+
+    const newRecorder = (stream, mimeType) => {
+        const attempts = [{ mimeType, audioBitsPerSecond: BITS_PER_SECOND }, { mimeType }, undefined];
+        let lastError = null;
+        for (const options of attempts) {
+            try {
+                return new MediaRecorder(stream, options);
+            } catch (e) {
+                lastError = e;
+            }
+        }
+        throw failure('recorder', lastError);
+    };
+
     const record = async ({ maxMs, onTick, onLimit }) => {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-        });
-        const mimeType = pickMimeType();
-        const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: BITS_PER_SECOND });
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                audio: { channelCount: { ideal: 1 }, echoCancellation: true, noiseSuppression: true },
+            });
+        } catch (e) {
+            throw failure('microphone', e);
+        }
+
+        const requested = pickMimeType();
+        let recorder;
+        try {
+            recorder = newRecorder(stream, requested);
+        } catch (e) {
+            stream.getTracks().forEach((track) => track.stop());
+            throw e.stage ? e : failure('recorder', e);
+        }
+
+        const mimeType = recorder.mimeType || requested || 'audio/webm';
         const parts = [];
         const startedAt = performance.now();
         let stoppedAt = null;
