@@ -68,23 +68,40 @@ globalThis.OneLineVoice = (() => {
         throw failure('recorder', lastError);
     };
 
-    const record = async ({ maxMs, onTick, onLimit }) => {
-        const previousSession = readAudioSession();
-        writeAudioSession('play-and-record');
+    const MIC_CONSTRAINTS = {
+        audio: {
+            channelCount: { ideal: 1 },
+            sampleRate: { ideal: 48000 },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+        },
+    };
 
+    const openMicrophone = async () => {
+        const previous = readAudioSession();
+        if (previous === null) {
+            return { stream: await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS), previous };
+        }
+        let lastError = null;
+        for (const session of ['auto', 'play-and-record']) {
+            writeAudioSession(session);
+            try {
+                return { stream: await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS), previous };
+            } catch (e) {
+                lastError = e;
+            }
+        }
+        writeAudioSession(previous);
+        throw lastError;
+    };
+
+    const record = async ({ maxMs, onTick, onLimit }) => {
         let stream;
+        let previousSession = null;
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    channelCount: { ideal: 1 },
-                    sampleRate: { ideal: 48000 },
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false,
-                },
-            });
+            ({ stream, previous: previousSession } = await openMicrophone());
         } catch (e) {
-            writeAudioSession(previousSession);
             throw failure('microphone', e);
         }
 
@@ -99,6 +116,7 @@ globalThis.OneLineVoice = (() => {
         }
 
         const mimeType = recorder.mimeType || requested || 'audio/webm';
+        const track = stream.getAudioTracks()[0];
         const parts = [];
         const startedAt = performance.now();
         let stoppedAt = null;
@@ -125,6 +143,8 @@ globalThis.OneLineVoice = (() => {
                     blob: new Blob(parts, { type: mimeType }),
                     durationMs: Math.round((stoppedAt ?? performance.now()) - startedAt),
                     mimeType,
+                    // What the microphone actually gave us, as opposed to what was asked for.
+                    settings: track?.getSettings?.() ?? {},
                 });
             });
         });

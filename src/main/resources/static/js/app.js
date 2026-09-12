@@ -217,6 +217,7 @@ const initChat = async (root) => {
     const CHUNK_OVERHEAD_BYTES = 1 + 12 + 16;
     const UPLOAD_CONCURRENCY = 4;
     const VOICE_MAX_MS = 5 * 60 * 1000;
+    const VOICE_DIAG = new URLSearchParams(globalThis.location.search).get('diag') === '1';
     const VOICE_INLINE_MAX_BYTES = 12 * 1024 * 1024;
 
     const humanizeTtl = (sec) => {
@@ -1393,6 +1394,11 @@ const initChat = async (root) => {
                 measured = await OneLineVoice.analyze(result.blob);
             } catch (e) {
                 console.warn('Could not measure the recording', e);
+            }
+            if (VOICE_DIAG) {
+                const s = result.settings || {};
+                const kbps = Math.round((result.blob.size * 8) / Math.max(1, result.durationMs));
+                setStatus('online', `${s.sampleRate ?? '?'}Hz ${s.channelCount ?? '?'}ch ec=${s.echoCancellation ?? '?'} agc=${s.autoGainControl ?? '?'} | ${result.mimeType} ${kbps}kbps`);
             }
             await uploadFile(file, {
                 durationMs: measured?.durationMs ?? result.durationMs,
