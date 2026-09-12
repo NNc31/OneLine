@@ -11,6 +11,11 @@ globalThis.OneLineVoice = (() => {
     const TICK_MS = 100;
     const TARGET_RMS = 0.08;
     const MAX_GAIN = 8;
+    const RUMBLE_HZ = 80;
+    const PRESENCE_HZ = 3000;
+    const PRESENCE_Q = 0.7;
+    const PRESENCE_DB = 5;
+    const PRESENCE_LINEAR = 10 ** (PRESENCE_DB / 20);
 
     let sharedContext = null;
     let activePlayer = null;
@@ -410,7 +415,9 @@ globalThis.OneLineVoice = (() => {
                 peaks ??= measured.peaks;
                 const average = rms(buffer.getChannelData(0));
                 const wanted = average > 0 ? TARGET_RMS / average : 1;
-                const ceiling = measured.loudest > 0 ? 0.97 / measured.loudest : MAX_GAIN;
+                // The presence lift raises the peak too, so leave it room rather than clip.
+                const headroom = measured.loudest * PRESENCE_LINEAR;
+                const ceiling = headroom > 0 ? 0.97 / headroom : MAX_GAIN;
                 gain = Math.max(1, Math.min(MAX_GAIN, wanted, ceiling));
                 return buffer;
             } finally {
@@ -445,9 +452,23 @@ globalThis.OneLineVoice = (() => {
 
             source = ctx.createBufferSource();
             source.buffer = buffer;
+
+            const rumble = ctx.createBiquadFilter();
+            rumble.type = 'highpass';
+            rumble.frequency.value = RUMBLE_HZ;
+
+            const presence = ctx.createBiquadFilter();
+            presence.type = 'peaking';
+            presence.frequency.value = PRESENCE_HZ;
+            presence.Q.value = PRESENCE_Q;
+            presence.gain.value = PRESENCE_DB;
+
             const amplifier = ctx.createGain();
             amplifier.gain.value = gain;
-            source.connect(amplifier);
+
+            source.connect(rumble);
+            rumble.connect(presence);
+            presence.connect(amplifier);
             amplifier.connect(ctx.destination);
             source.onended = () => {
                 if (playing) {
