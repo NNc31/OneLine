@@ -123,7 +123,6 @@ globalThis.OneLineVoice = (() => {
         }
 
         const mimeType = recorder.mimeType || requested || 'audio/webm';
-        const track = stream.getAudioTracks()[0];
         const parts = [];
         const startedAt = performance.now();
         let stoppedAt = null;
@@ -150,8 +149,6 @@ globalThis.OneLineVoice = (() => {
                     blob: new Blob(parts, { type: mimeType }),
                     durationMs: Math.round((stoppedAt ?? performance.now()) - startedAt),
                     mimeType,
-                    // What the microphone actually gave us, as opposed to what was asked for.
-                    settings: track?.getSettings?.() ?? {},
                 });
             });
         });
@@ -218,24 +215,6 @@ globalThis.OneLineVoice = (() => {
         return Math.sqrt(sum / Math.max(1, samples.length));
     };
 
-    const highFrequencyRatio = async (buffer) => {
-        const OfflineCtor = globalThis.OfflineAudioContext ?? globalThis.webkitOfflineAudioContext;
-        if (!OfflineCtor) {
-            return null;
-        }
-        const offline = new OfflineCtor(1, buffer.length, buffer.sampleRate);
-        const source = offline.createBufferSource();
-        source.buffer = buffer;
-        const filter = offline.createBiquadFilter();
-        filter.type = 'highpass';
-        filter.frequency.value = 5000;
-        source.connect(filter);
-        filter.connect(offline.destination);
-        source.start();
-        const filtered = await offline.startRendering();
-        return rms(filtered.getChannelData(0)) / Math.max(1e-9, rms(buffer.getChannelData(0)));
-    };
-
     const encodePeaks = (peaks) => {
         let binary = '';
         for (const peak of peaks) {
@@ -268,7 +247,6 @@ globalThis.OneLineVoice = (() => {
         return {
             peaks: encodePeaks(peaks),
             durationMs: Math.round(buffer.duration * 1000),
-            hfRatio: await highFrequencyRatio(buffer).catch(() => null),
         };
     };
 
