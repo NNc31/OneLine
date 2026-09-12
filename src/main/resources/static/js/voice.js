@@ -38,6 +38,23 @@ globalThis.OneLineVoice = (() => {
     const failure = (stage, cause) =>
         Object.assign(new Error(stage), { stage, reason: cause?.name || 'unknown', cause });
 
+    const readAudioSession = () => {
+        try {
+            return navigator.audioSession?.type ?? null;
+        } catch {
+            return null;
+        }
+    };
+
+    const writeAudioSession = (type) => {
+        try {
+            if (navigator.audioSession && type) {
+                navigator.audioSession.type = type;
+            }
+        } catch {
+        }
+    };
+
     const newRecorder = (stream, mimeType) => {
         const attempts = [{ mimeType, audioBitsPerSecond: BITS_PER_SECOND }, { mimeType }, undefined];
         let lastError = null;
@@ -52,12 +69,16 @@ globalThis.OneLineVoice = (() => {
     };
 
     const record = async ({ maxMs, onTick, onLimit }) => {
+        const previousSession = readAudioSession();
+        writeAudioSession('play-and-record');
+
         let stream;
         try {
             stream = await navigator.mediaDevices.getUserMedia({
                 audio: { channelCount: { ideal: 1 }, echoCancellation: true, noiseSuppression: true },
             });
         } catch (e) {
+            writeAudioSession(previousSession);
             throw failure('microphone', e);
         }
 
@@ -67,6 +88,7 @@ globalThis.OneLineVoice = (() => {
             recorder = newRecorder(stream, requested);
         } catch (e) {
             stream.getTracks().forEach((track) => track.stop());
+            writeAudioSession(previousSession);
             throw e.stage ? e : failure('recorder', e);
         }
 
@@ -92,6 +114,7 @@ globalThis.OneLineVoice = (() => {
             recorder.addEventListener('stop', () => {
                 clearTimers();
                 stream.getTracks().forEach((track) => track.stop());
+                writeAudioSession(previousSession);
                 resolve({
                     blob: new Blob(parts, { type: mimeType }),
                     durationMs: Math.round((stoppedAt ?? performance.now()) - startedAt),
