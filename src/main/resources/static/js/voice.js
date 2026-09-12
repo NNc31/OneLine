@@ -9,6 +9,13 @@ globalThis.OneLineVoice = (() => {
     const BARS = 44;
     const MIN_BAR_HEIGHT = 0.06;
     const TICK_MS = 100;
+    const TARGET_RMS = 0.08;
+    const MAX_GAIN = 8;
+    const RUMBLE_HZ = 80;
+    const PRESENCE_HZ = 3000;
+    const PRESENCE_Q = 0.7;
+    const PRESENCE_DB = 5;
+    const PRESENCE_LINEAR = 10 ** (PRESENCE_DB / 20);
 
     let sharedContext = null;
     let activePlayer = null;
@@ -68,23 +75,40 @@ globalThis.OneLineVoice = (() => {
         throw failure('recorder', lastError);
     };
 
-    const record = async ({ maxMs, onTick, onLimit }) => {
-        const previousSession = readAudioSession();
-        writeAudioSession('play-and-record');
+    const MIC_CONSTRAINTS = {
+        audio: {
+            channelCount: { ideal: 1 },
+            sampleRate: { ideal: 48000 },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: true,
+        },
+    };
 
+    const openMicrophone = async () => {
+        const previous = readAudioSession();
+        if (previous === null) {
+            return { stream: await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS), previous };
+        }
+        let lastError = null;
+        for (const session of ['auto', 'play-and-record']) {
+            writeAudioSession(session);
+            try {
+                return { stream: await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS), previous };
+            } catch (e) {
+                lastError = e;
+            }
+        }
+        writeAudioSession(previous);
+        throw lastError;
+    };
+
+    const record = async ({ maxMs, onTick, onLimit }) => {
         let stream;
+        let previousSession = null;
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    channelCount: { ideal: 1 },
-                    sampleRate: { ideal: 48000 },
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false,
-                },
-            });
+            ({ stream, previous: previousSession } = await openMicrophone());
         } catch (e) {
-            writeAudioSession(previousSession);
             throw failure('microphone', e);
         }
 
@@ -180,7 +204,15 @@ globalThis.OneLineVoice = (() => {
                 peaks[bar] /= loudest;
             }
         }
-        return peaks;
+        return { peaks, loudest };
+    };
+
+    const rms = (samples) => {
+        let sum = 0;
+        for (let i = 0; i < samples.length; i++) {
+            sum += samples[i] * samples[i];
+        }
+        return Math.sqrt(sum / Math.max(1, samples.length));
     };
 
     const encodePeaks = (peaks) => {
@@ -211,8 +243,9 @@ globalThis.OneLineVoice = (() => {
         }
         const bytes = new Uint8Array(await blob.arrayBuffer());
         const buffer = await ctx.decodeAudioData(bytes.buffer);
+        const { peaks } = peaksOf(buffer);
         return {
-            peaks: encodePeaks(peaksOf(buffer)),
+            peaks: encodePeaks(peaks),
             durationMs: Math.round(buffer.duration * 1000),
         };
     };
@@ -240,6 +273,8 @@ globalThis.OneLineVoice = (() => {
 
         let buffer = null;
         let peaks = encodedPeaks ? decodePeaks(encodedPeaks) : null;
+        let gain = 1;
+        let playbackSession = null;
         let source = null;
         let offsetSeconds = 0;
         let startedAtContextTime = 0;
@@ -323,6 +358,7 @@ globalThis.OneLineVoice = (() => {
             offsetSeconds = positionSeconds();
             playing = false;
             stopSource();
+            writeAudioSession(playbackSession);
             cancelAnimationFrame(frame);
             playBtn.classList.remove('playing');
             playBtn.setAttribute('aria-label', 'Play voice message');
@@ -333,6 +369,7 @@ globalThis.OneLineVoice = (() => {
             playing = false;
             offsetSeconds = 0;
             source = null;
+            writeAudioSession(playbackSession);
             cancelAnimationFrame(frame);
             playBtn.classList.remove('playing');
             playBtn.setAttribute('aria-label', 'Play voice message');
@@ -352,7 +389,14 @@ globalThis.OneLineVoice = (() => {
                     throw new Error('Web Audio unavailable');
                 }
                 buffer = await ctx.decodeAudioData(bytes.slice().buffer);
-                peaks ??= peaksOf(buffer);
+                const measured = peaksOf(buffer);
+                peaks ??= measured.peaks;
+                const average = rms(buffer.getChannelData(0));
+                const wanted = average > 0 ? TARGET_RMS / average : 1;
+                // The presence lift raises the peak too, so leave it room rather than clip.
+                const headroom = measured.loudest * PRESENCE_LINEAR;
+                const ceiling = headroom > 0 ? 0.97 / headroom : MAX_GAIN;
+                gain = Math.max(1, Math.min(MAX_GAIN, wanted, ceiling));
                 return buffer;
             } finally {
                 loading = false;
@@ -375,9 +419,35 @@ globalThis.OneLineVoice = (() => {
             if (offsetSeconds >= buffer.duration - 0.05) {
                 offsetSeconds = 0;
             }
+            /*
+             * iOS routes output to the earpiece while the page sits in the 'play-and-record'
+             * session left over from recording - the same small speaker a phone call uses,
+             * which is exactly what it sounds like. 'playback' puts it back on the main
+             * speaker; the previous session is handed back when playback stops.
+             */
+            playbackSession = readAudioSession();
+            writeAudioSession('playback');
+
             source = ctx.createBufferSource();
             source.buffer = buffer;
-            source.connect(ctx.destination);
+
+            const rumble = ctx.createBiquadFilter();
+            rumble.type = 'highpass';
+            rumble.frequency.value = RUMBLE_HZ;
+
+            const presence = ctx.createBiquadFilter();
+            presence.type = 'peaking';
+            presence.frequency.value = PRESENCE_HZ;
+            presence.Q.value = PRESENCE_Q;
+            presence.gain.value = PRESENCE_DB;
+
+            const amplifier = ctx.createGain();
+            amplifier.gain.value = gain;
+
+            source.connect(rumble);
+            rumble.connect(presence);
+            presence.connect(amplifier);
+            amplifier.connect(ctx.destination);
             source.onended = () => {
                 if (playing) {
                     reachedEnd();
