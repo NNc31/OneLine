@@ -33,7 +33,7 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .referrerPolicy(rp -> rp.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                         .contentSecurityPolicy(csp2 -> csp2.policyDirectives(csp))
-                        .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()")))
+                        .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy", "camera=(), microphone=(self), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()")))
                 .exceptionHandling(eh -> eh.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/chats/*").permitAll()

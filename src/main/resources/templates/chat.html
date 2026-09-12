@@ -57,7 +57,7 @@
 
         <section id="missing-secret" class="join-card" hidden>
             <h2>Missing access</h2>
-            <p>The link you opened doesn't contain a secret. Ask whoever shared it to send the full URL — the part after <code>#</code> is the access token.</p>
+            <p>The link you opened doesn't contain a secret. Ask whoever shared it to send the full URL - the part after <code>#</code> is the access token.</p>
         </section>
 
         <section id="join-card" class="join-card" hidden>
@@ -107,14 +107,30 @@
             <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
         </svg>
     </button>
+    <button type="button" id="voice-btn" class="attach" hidden aria-label="Record a voice message" title="Record a voice message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+        </svg>
+    </button>
     <textarea id="send-input" name="content" maxlength="4000" rows="1" enterkeyhint="enter" aria-label="Message" placeholder="Type something" autocomplete="off"></textarea>
     <button type="submit" class="primary">Send</button>
 </form>
+<div id="voice-bar" class="voice-bar" hidden>
+    <span class="voice-bar-dot" aria-hidden="true"></span>
+    <span class="voice-bar-label">Recording</span>
+    <span id="voice-bar-time" class="voice-bar-time">0:00</span>
+    <span class="spacer"></span>
+    <button type="button" id="voice-cancel" class="voice-bar-cancel">Cancel</button>
+    <button type="button" id="voice-send" class="primary">Send</button>
+</div>
 <div id="conn-status" class="conn-status" data-state="connecting" hidden>Connecting...</div>
 <dialog id="lightbox" class="lightbox" aria-label="Image preview"><img alt=""></dialog>
 
 <script th:src="@{/js/stomp.umd.min.js}"></script>
 <script th:src="@{/js/crypto.js}"></script>
+<script th:src="@{/js/voice.js}"></script>
 <script th:src="@{/js/app.js}" type="module"></script>
 
 </body>

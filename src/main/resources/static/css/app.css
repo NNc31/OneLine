@@ -695,17 +695,12 @@ body.chat-page {
 }
 
 .send {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: end;
+    display: flex;
+    align-items: flex-end;
     gap: 12px;
     padding: 12px 24px;
     border-top: 1px solid var(--border);
     background: var(--surface);
-}
-
-.send:has(.attach[hidden]) {
-    grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .send input {
@@ -714,6 +709,7 @@ body.chat-page {
 }
 
 .send textarea {
+    flex: 1;
     padding: 11px 14px;
     min-width: 0;
     border: 1px solid var(--border);
@@ -768,6 +764,132 @@ body.chat-page {
 
 .message .body.attachment {
     margin-top: 2px;
+}
+
+.voice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: min(260px, 60vw);
+}
+
+.voice-play {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--accent);
+    cursor: pointer;
+    position: relative;
+    transition: color 120ms ease, border-color 120ms ease;
+}
+
+.voice-play:hover {
+    border-color: var(--accent);
+}
+
+.voice-play::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 6px 0 6px 10px;
+    border-color: transparent transparent transparent currentColor;
+    transform: translateX(1px);
+}
+
+/* border-box, so the 8px width holds two 3px bars with a 2px gap between them. */
+.voice-play.playing::before {
+    width: 8px;
+    height: 12px;
+    border-width: 0 3px;
+    border-color: currentColor;
+    transform: none;
+}
+
+.voice-wave {
+    flex: 1;
+    height: 30px;
+    min-width: 80px;
+    cursor: pointer;
+}
+
+.voice-time {
+    flex: none;
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.voice.loading .voice-play {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+.voice.failed .voice-wave {
+    opacity: 0.4;
+}
+
+.voice-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.voice-bar .spacer {
+    flex: 1;
+}
+
+.voice-bar-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--error);
+    animation: voice-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .voice-bar-dot {
+        animation: none;
+    }
+}
+
+.voice-bar-label {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.voice-bar-time {
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+}
+
+.voice-bar-cancel {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    padding: 8px 14px;
+    cursor: pointer;
+}
+
+.voice-bar-cancel:hover {
+    color: var(--text);
+    border-color: var(--text);
 }
 
 .message .attachment-image {

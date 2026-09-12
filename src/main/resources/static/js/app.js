@@ -19,6 +19,11 @@ const initChat = async (root) => {
     const ttlNoteEl = document.getElementById('ttl-note');
     const attachBtnEl = document.getElementById('attach-btn');
     const attachInputEl = document.getElementById('attach-input');
+    const voiceBtnEl = document.getElementById('voice-btn');
+    const voiceBarEl = document.getElementById('voice-bar');
+    const voiceBarTimeEl = document.getElementById('voice-bar-time');
+    const voiceCancelEl = document.getElementById('voice-cancel');
+    const voiceSendEl = document.getElementById('voice-send');
     const uploadProgressEl = document.getElementById('upload-progress');
     const uploadProgressLabelEl = document.getElementById('upload-progress-label');
     const uploadProgressFillEl = document.getElementById('upload-progress-fill');
@@ -211,6 +216,8 @@ const initChat = async (root) => {
     const CHUNK_PLAIN_BYTES = 4 * 1024 * 1024;
     const CHUNK_OVERHEAD_BYTES = 1 + 12 + 16;
     const UPLOAD_CONCURRENCY = 4;
+    const VOICE_MAX_MS = 5 * 60 * 1000;
+    const VOICE_INLINE_MAX_BYTES = 12 * 1024 * 1024;
 
     const humanizeTtl = (sec) => {
         if (sec % 86400 === 0) {
@@ -236,6 +243,9 @@ const initChat = async (root) => {
         if (attachBtnEl) {
             attachBtnEl.hidden = !attachmentsEnabled;
         }
+        if (voiceBtnEl) {
+            voiceBtnEl.hidden = !attachmentsEnabled || !globalThis.OneLineVoice?.isSupported();
+        }
     };
 
     const parsePayload = (text) => {
@@ -255,7 +265,9 @@ const initChat = async (root) => {
     const snippetOf = (body) => {
         const payload = parsePayload(body);
         let text;
-        if (isFilePayload(payload)) {
+        if (isFilePayload(payload) && payload.durationMs && globalThis.OneLineVoice) {
+            text = `Voice message (${OneLineVoice.formatTime(payload.durationMs)})`;
+        } else if (isFilePayload(payload)) {
             text = payload.name || 'attachment';
         } else if (payload?.k === REPLY_MARKER) {
             text = payload.text || '';
@@ -373,8 +385,23 @@ const initChat = async (root) => {
         return assembled;
     };
 
+    const isPlayableAudio = (payload) =>
+        typeof payload.mime === 'string'
+        && payload.mime.startsWith('audio/')
+        && Number(payload.size) <= VOICE_INLINE_MAX_BYTES
+        && globalThis.OneLineVoice;
+
     const renderFileBody = (li, body, payload) => {
         body.classList.add('attachment');
+        if (isPlayableAudio(payload)) {
+            const player = OneLineVoice.createPlayer({
+                durationMs: Number(payload.durationMs) || 0,
+                peaks: payload.peaks,
+                load: () => downloadAndDecrypt(payload),
+            });
+            body.appendChild(player.element);
+            return;
+        }
         const isImage = typeof payload.mime === 'string' && payload.mime.startsWith('image/');
         if (isImage) {
             const img = document.createElement('img');
@@ -1141,7 +1168,7 @@ const initChat = async (root) => {
             }
             const pct = Math.round(ratio * 100);
             uploadProgressFillEl.style.width = pct + '%';
-            uploadProgressLabelEl.textContent = `Uploading ${name} — ${pct}%`;
+            uploadProgressLabelEl.textContent = `Uploading ${name} - ${pct}%`;
         };
         const hideProgress = () => {
             if (uploadProgressEl) {
@@ -1206,7 +1233,7 @@ const initChat = async (root) => {
             await Promise.all(workers);
         };
 
-        const publishAttachmentMessage = async (attachmentId, file, fileKeyRaw, chunkCount) => {
+        const publishAttachmentMessage = async (attachmentId, file, fileKeyRaw, chunkCount, extra) => {
             const payload = JSON.stringify({
                 k: FILE_MARKER_V2,
                 id: attachmentId,
@@ -1215,6 +1242,7 @@ const initChat = async (root) => {
                 size: file.size,
                 key: OneLineCrypto.base64Encode(fileKeyRaw),
                 chunkCount,
+                ...extra,
                 ...(replyTo ? { to: replyTo.id, author: replyTo.author, snippet: replyTo.snippet } : {}),
             });
             cancelReply();
@@ -1227,7 +1255,7 @@ const initChat = async (root) => {
             });
         };
 
-        const uploadFile = async (file) => {
+        const uploadFile = async (file, extra) => {
             if (!client.connected || !cryptoKey) {
                 return;
             }
@@ -1306,7 +1334,7 @@ const initChat = async (root) => {
                     throw new Error('confirm ' + confirmResp.status);
                 }
 
-                await publishAttachmentMessage(attachmentId, file, fileKeyRaw, chunkCount);
+                await publishAttachmentMessage(attachmentId, file, fileKeyRaw, chunkCount, extra);
             } catch (e) {
                 if (e?.aborted) {
                     setStatus(statusEl.dataset.state || 'online', 'Upload cancelled');
@@ -1329,6 +1357,82 @@ const initChat = async (root) => {
                 await uploadFile(file);
             }
         });
+
+        let activeRecording = null;
+
+        const extensionFor = (mimeType) => {
+            if (mimeType.includes('ogg')) {
+                return 'ogg';
+            }
+            return mimeType.includes('mp4') ? 'm4a' : 'webm';
+        };
+
+        const closeRecordingBar = () => {
+            activeRecording = null;
+            voiceBarEl.hidden = true;
+            sendFormEl.hidden = false;
+            voiceBarTimeEl.textContent = '0:00';
+        };
+
+        const finishRecording = async () => {
+            const recording = activeRecording;
+            if (!recording) {
+                return;
+            }
+            activeRecording = null;
+            const result = await recording.stop();
+            closeRecordingBar();
+            if (!result || result.blob.size === 0 || result.durationMs < 500) {
+                setStatus(statusEl.dataset.state || 'online', 'Recording too short');
+                return;
+            }
+            const name = `voice-${Date.now()}.${extensionFor(result.mimeType)}`;
+            const file = new File([result.blob], name, { type: result.mimeType });
+            let measured = null;
+            try {
+                measured = await OneLineVoice.analyze(result.blob);
+            } catch (e) {
+                console.warn('Could not measure the recording', e);
+            }
+            await uploadFile(file, {
+                durationMs: measured?.durationMs ?? result.durationMs,
+                ...(measured?.peaks ? { peaks: measured.peaks } : {}),
+            });
+        };
+
+        const startRecording = async () => {
+            if (activeRecording || !attachmentsEnabled) {
+                return;
+            }
+            try {
+                activeRecording = await OneLineVoice.record({
+                    maxMs: VOICE_MAX_MS,
+                    onTick: (ms) => {
+                        voiceBarTimeEl.textContent = OneLineVoice.formatTime(ms);
+                    },
+                    onLimit: finishRecording,
+                });
+            } catch (e) {
+                console.error('Microphone unavailable', e);
+                setStatus('error', 'Microphone unavailable - check the browser permission');
+                return;
+            }
+            sendFormEl.hidden = true;
+            voiceBarEl.hidden = false;
+        };
+
+        const cancelRecording = async () => {
+            const recording = activeRecording;
+            if (!recording) {
+                return;
+            }
+            closeRecordingBar();
+            await recording.cancel();
+        };
+
+        voiceBtnEl.addEventListener('click', startRecording);
+        voiceSendEl.addEventListener('click', finishRecording);
+        voiceCancelEl.addEventListener('click', cancelRecording);
 
         const hasFiles = (dt) => Array.from(dt?.types || []).includes('Files');
         let dragDepth = 0;
