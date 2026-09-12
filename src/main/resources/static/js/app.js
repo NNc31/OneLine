@@ -1398,7 +1398,8 @@ const initChat = async (root) => {
             if (VOICE_DIAG) {
                 const s = result.settings || {};
                 const kbps = Math.round((result.blob.size * 8) / Math.max(1, result.durationMs));
-                setStatus('online', `${s.sampleRate ?? '?'}Hz ${s.channelCount ?? '?'}ch ec=${s.echoCancellation ?? '?'} agc=${s.autoGainControl ?? '?'} | ${result.mimeType} ${kbps}kbps`);
+                const hf = measured?.hfRatio;
+                setStatus('online', `${s.sampleRate ?? '?'}Hz ec=${s.echoCancellation ?? '?'} | ${kbps}kbps | hf=${hf === null || hf === undefined ? '?' : hf.toFixed(4)}`);
             }
             await uploadFile(file, {
                 durationMs: measured?.durationMs ?? result.durationMs,

@@ -200,7 +200,33 @@ globalThis.OneLineVoice = (() => {
                 peaks[bar] /= loudest;
             }
         }
-        return peaks;
+        return { peaks, loudest };
+    };
+
+    const rms = (samples) => {
+        let sum = 0;
+        for (let i = 0; i < samples.length; i++) {
+            sum += samples[i] * samples[i];
+        }
+        return Math.sqrt(sum / Math.max(1, samples.length));
+    };
+
+    const highFrequencyRatio = async (buffer) => {
+        const OfflineCtor = globalThis.OfflineAudioContext ?? globalThis.webkitOfflineAudioContext;
+        if (!OfflineCtor) {
+            return null;
+        }
+        const offline = new OfflineCtor(1, buffer.length, buffer.sampleRate);
+        const source = offline.createBufferSource();
+        source.buffer = buffer;
+        const filter = offline.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 5000;
+        source.connect(filter);
+        filter.connect(offline.destination);
+        source.start();
+        const filtered = await offline.startRendering();
+        return rms(filtered.getChannelData(0)) / Math.max(1e-9, rms(buffer.getChannelData(0)));
     };
 
     const encodePeaks = (peaks) => {
@@ -231,9 +257,11 @@ globalThis.OneLineVoice = (() => {
         }
         const bytes = new Uint8Array(await blob.arrayBuffer());
         const buffer = await ctx.decodeAudioData(bytes.buffer);
+        const { peaks } = peaksOf(buffer);
         return {
-            peaks: encodePeaks(peaksOf(buffer)),
+            peaks: encodePeaks(peaks),
             durationMs: Math.round(buffer.duration * 1000),
+            hfRatio: await highFrequencyRatio(buffer).catch(() => null),
         };
     };
 
@@ -260,6 +288,8 @@ globalThis.OneLineVoice = (() => {
 
         let buffer = null;
         let peaks = encodedPeaks ? decodePeaks(encodedPeaks) : null;
+        let gain = 1;
+        let playbackSession = null;
         let source = null;
         let offsetSeconds = 0;
         let startedAtContextTime = 0;
@@ -343,6 +373,7 @@ globalThis.OneLineVoice = (() => {
             offsetSeconds = positionSeconds();
             playing = false;
             stopSource();
+            writeAudioSession(playbackSession);
             cancelAnimationFrame(frame);
             playBtn.classList.remove('playing');
             playBtn.setAttribute('aria-label', 'Play voice message');
@@ -353,6 +384,7 @@ globalThis.OneLineVoice = (() => {
             playing = false;
             offsetSeconds = 0;
             source = null;
+            writeAudioSession(playbackSession);
             cancelAnimationFrame(frame);
             playBtn.classList.remove('playing');
             playBtn.setAttribute('aria-label', 'Play voice message');
@@ -372,7 +404,9 @@ globalThis.OneLineVoice = (() => {
                     throw new Error('Web Audio unavailable');
                 }
                 buffer = await ctx.decodeAudioData(bytes.slice().buffer);
-                peaks ??= peaksOf(buffer);
+                const measured = peaksOf(buffer);
+                peaks ??= measured.peaks;
+                gain = measured.loudest > 0 ? Math.min(8, 0.9 / measured.loudest) : 1;
                 return buffer;
             } finally {
                 loading = false;
@@ -395,9 +429,21 @@ globalThis.OneLineVoice = (() => {
             if (offsetSeconds >= buffer.duration - 0.05) {
                 offsetSeconds = 0;
             }
+            /*
+             * iOS routes output to the earpiece while the page sits in the 'play-and-record'
+             * session left over from recording - the same small speaker a phone call uses,
+             * which is exactly what it sounds like. 'playback' puts it back on the main
+             * speaker; the previous session is handed back when playback stops.
+             */
+            playbackSession = readAudioSession();
+            writeAudioSession('playback');
+
             source = ctx.createBufferSource();
             source.buffer = buffer;
-            source.connect(ctx.destination);
+            const amplifier = ctx.createGain();
+            amplifier.gain.value = gain;
+            source.connect(amplifier);
+            amplifier.connect(ctx.destination);
             source.onended = () => {
                 if (playing) {
                     reachedEnd();
