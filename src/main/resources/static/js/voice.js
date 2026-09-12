@@ -9,6 +9,8 @@ globalThis.OneLineVoice = (() => {
     const BARS = 44;
     const MIN_BAR_HEIGHT = 0.06;
     const TICK_MS = 100;
+    const TARGET_RMS = 0.08;
+    const MAX_GAIN = 8;
 
     let sharedContext = null;
     let activePlayer = null;
@@ -74,7 +76,7 @@ globalThis.OneLineVoice = (() => {
             sampleRate: { ideal: 48000 },
             echoCancellation: false,
             noiseSuppression: false,
-            autoGainControl: false,
+            autoGainControl: true,
         },
     };
 
@@ -406,7 +408,10 @@ globalThis.OneLineVoice = (() => {
                 buffer = await ctx.decodeAudioData(bytes.slice().buffer);
                 const measured = peaksOf(buffer);
                 peaks ??= measured.peaks;
-                gain = measured.loudest > 0 ? Math.min(8, 0.9 / measured.loudest) : 1;
+                const average = rms(buffer.getChannelData(0));
+                const wanted = average > 0 ? TARGET_RMS / average : 1;
+                const ceiling = measured.loudest > 0 ? 0.97 / measured.loudest : MAX_GAIN;
+                gain = Math.max(1, Math.min(MAX_GAIN, wanted, ceiling));
                 return buffer;
             } finally {
                 loading = false;
