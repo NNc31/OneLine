@@ -1,5 +1,6 @@
 package com.nefodov.oneline.chat;
 
+import com.nefodov.oneline.TestImages;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.DisplayName;
@@ -50,7 +51,7 @@ class ChatLifecycleSchedulerTest {
     @ServiceConnection(name = "redis")
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer("minio/minio");
+    static final MinIOContainer MINIO = new MinIOContainer(TestImages.MINIO);
 
     @DynamicPropertySource
     static void storageProperties(DynamicPropertyRegistry registry) {

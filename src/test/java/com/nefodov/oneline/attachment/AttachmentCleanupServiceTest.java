@@ -1,5 +1,6 @@
 package com.nefodov.oneline.attachment;
 
+import com.nefodov.oneline.TestImages;
 import com.nefodov.oneline.chat.Chat;
 import com.nefodov.oneline.chat.ChatParticipant;
 import com.nefodov.oneline.config.OneLineProperties;
@@ -44,7 +45,7 @@ class AttachmentCleanupServiceTest {
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer("minio/minio");
+    static final MinIOContainer MINIO = new MinIOContainer(TestImages.MINIO);
 
     @DynamicPropertySource
     static void storageProperties(DynamicPropertyRegistry registry) {

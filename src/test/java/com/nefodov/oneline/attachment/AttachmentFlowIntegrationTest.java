@@ -1,6 +1,7 @@
 package com.nefodov.oneline.attachment;
 
 import com.nefodov.oneline.AbstractWebIntegrationTest;
+import com.nefodov.oneline.TestImages;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
@@ -43,7 +44,7 @@ class AttachmentFlowIntegrationTest extends AbstractWebIntegrationTest {
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer("minio/minio");
+    static final MinIOContainer MINIO = new MinIOContainer(TestImages.MINIO);
 
     @DynamicPropertySource
     static void storageProperties(DynamicPropertyRegistry registry) {
