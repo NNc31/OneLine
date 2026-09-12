@@ -5,7 +5,7 @@ globalThis.OneLineVoice = (() => {
         'audio/mp4',
         'audio/webm',
     ];
-    const BITS_PER_SECOND = 24000;
+    const bitrateFor = (mimeType) => (mimeType?.includes('opus') ? 32000 : 64000);
     const BARS = 44;
     const MIN_BAR_HEIGHT = 0.06;
     const TICK_MS = 100;
@@ -56,7 +56,7 @@ globalThis.OneLineVoice = (() => {
     };
 
     const newRecorder = (stream, mimeType) => {
-        const attempts = [{ mimeType, audioBitsPerSecond: BITS_PER_SECOND }, { mimeType }, undefined];
+        const attempts = [{ mimeType, audioBitsPerSecond: bitrateFor(mimeType) }, { mimeType }, undefined];
         let lastError = null;
         for (const options of attempts) {
             try {
@@ -75,7 +75,13 @@ globalThis.OneLineVoice = (() => {
         let stream;
         try {
             stream = await navigator.mediaDevices.getUserMedia({
-                audio: { channelCount: { ideal: 1 }, echoCancellation: true, noiseSuppression: true },
+                audio: {
+                    channelCount: { ideal: 1 },
+                    sampleRate: { ideal: 48000 },
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false,
+                },
             });
         } catch (e) {
             writeAudioSession(previousSession);
