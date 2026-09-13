@@ -656,7 +656,22 @@ const initChat = async (root) => {
         }
     };
 
-    const deleteMessage = async (messageId) => {
+    const deleteAttachment = async (attachmentId) => {
+        try {
+            const resp = await fetch(`/api/chats/${publicId}/attachments/${attachmentId}`, {
+                method: 'DELETE',
+                headers: apiHeaders(),
+                credentials: 'same-origin',
+            });
+            if (!resp.ok && resp.status !== 404) {
+                throw new Error(`attachment delete ${resp.status}`);
+            }
+        } catch (e) {
+            console.warn('Attachment could not be removed now, leaving it to expire', e);
+        }
+    };
+
+    const deleteMessage = async (messageId, attachmentId) => {
         if (!globalThis.confirm('Delete this message for everyone?')) {
             return;
         }
@@ -670,13 +685,17 @@ const initChat = async (root) => {
                 throw new Error(`delete ${resp.status}`);
             }
             markDeleted(messageId);
+            if (attachmentId) {
+                await deleteAttachment(attachmentId);
+            }
         } catch (e) {
             console.error('Could not delete the message', e);
             setStatus('error', 'Could not delete the message');
         }
     };
 
-    const buildDeleteButton = (m) => {
+    const buildDeleteButton = (m, payload) => {
+        const attachmentId = isFilePayload(payload) ? payload.id : null;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'delete-btn';
@@ -696,7 +715,7 @@ const initChat = async (root) => {
         can.setAttribute('d', 'M19 6l-1 14H6L5 6');
         svg.append(lid, can);
         btn.appendChild(svg);
-        btn.addEventListener('click', () => deleteMessage(m.id));
+        btn.addEventListener('click', () => deleteMessage(m.id, attachmentId));
         return btn;
     };
 
@@ -747,16 +766,17 @@ const initChat = async (root) => {
         time.dateTime = m.createdAt;
         time.textContent = formatTime(m.createdAt);
 
+        const payload = parsePayload(body);
+
         const meta = document.createElement('span');
         meta.className = 'msg-meta';
         meta.append(time, buildReplyButton(m, body));
         if (m.participantId === meId) {
-            meta.appendChild(buildDeleteButton(m));
+            meta.appendChild(buildDeleteButton(m, payload));
         }
 
         const bodyEl = document.createElement('span');
         bodyEl.className = 'body';
-        const payload = parsePayload(body);
         if (payload?.to) {
             bodyEl.appendChild(buildQuoteEl(payload));
         }
