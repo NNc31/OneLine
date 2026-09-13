@@ -18,6 +18,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     Optional<Message> findByChatAndClientMessageId(Chat chat, UUID clientMessageId);
 
+    Optional<Message> findByIdAndChat(Long id, Chat chat);
+
     @Modifying
     @Query(value = """
             DELETE FROM messages m USING chats c WHERE m.chat_id = c.id

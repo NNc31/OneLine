@@ -3,6 +3,7 @@ package com.nefodov.oneline.message;
 import com.nefodov.oneline.chat.Chat;
 import com.nefodov.oneline.chat.ChatParticipant;
 import com.nefodov.oneline.chat.ChatSession;
+import com.nefodov.oneline.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,66 @@ class MessageServiceTest {
         assertEquals(clientMessageId, stored.getClientMessageId());
         assertArrayEquals(CONTENT, stored.getContent());
         assertEquals("chat", stored.getType());
+    }
+
+    @Test
+    @DisplayName("Deleting your own message throws the ciphertext away but keeps the row")
+    void deleteClearsOwnMessage() {
+        Message stored = message(participant, "chat", CONTENT);
+        when(messageRepository.findByIdAndChat(11L, chat)).thenReturn(Optional.of(stored));
+        Message deleted = service.delete(session, 11L);
+        assertEquals("deleted", deleted.getType());
+        assertEquals(0, deleted.getContent().length);
+    }
+
+    @Test
+    @DisplayName("Someone else's message is reported as missing rather than refused")
+    void deleteRejectsAnotherParticipantsMessage() {
+        ChatParticipant other = new ChatParticipant();
+        other.setId(4L);
+        other.setChat(chat);
+        other.setDisplayName("Alex");
+        Message stored = message(other, "chat", CONTENT);
+        when(messageRepository.findByIdAndChat(11L, chat)).thenReturn(Optional.of(stored));
+        assertThrows(NotFoundException.class, () -> service.delete(session, 11L));
+        assertEquals("chat", stored.getType());
+        assertArrayEquals(CONTENT, stored.getContent());
+    }
+
+    @Test
+    @DisplayName("A join notice cannot be deleted even by the participant it names")
+    void deleteRejectsSystemMessage() {
+        Message notice = message(participant, "joined", new byte[0]);
+        when(messageRepository.findByIdAndChat(11L, chat)).thenReturn(Optional.of(notice));
+        assertThrows(NotFoundException.class, () -> service.delete(session, 11L));
+        assertEquals("joined", notice.getType());
+    }
+
+    @Test
+    @DisplayName("Deleting twice is harmless")
+    void deleteIsIdempotent() {
+        Message stored = message(participant, "deleted", new byte[0]);
+        when(messageRepository.findByIdAndChat(11L, chat)).thenReturn(Optional.of(stored));
+        assertSame(stored, service.delete(session, 11L));
+        assertEquals("deleted", stored.getType());
+    }
+
+    @Test
+    @DisplayName("A message from another chat is not found")
+    void deleteRejectsForeignMessage() {
+        when(messageRepository.findByIdAndChat(11L, chat)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> service.delete(session, 11L));
+    }
+
+    private Message message(ChatParticipant author, String type, byte[] content) {
+        Message message = new Message();
+        message.setId(11L);
+        message.setChat(chat);
+        message.setParticipant(author);
+        message.setClientMessageId(UUID.randomUUID());
+        message.setContent(content);
+        message.setType(type);
+        return message;
     }
 
     @Test

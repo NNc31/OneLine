@@ -612,6 +612,69 @@ const initChat = async (root) => {
         return btn;
     };
 
+    const applyDeleted = (li) => {
+        revokeUrls(li);
+        li.classList.add('deleted');
+        const bodyEl = li.querySelector('.body');
+        if (bodyEl) {
+            bodyEl.replaceChildren();
+            bodyEl.className = 'body deleted-body';
+            bodyEl.textContent = 'Message deleted';
+        }
+        li.querySelectorAll('.reply-btn, .delete-btn').forEach((btn) => btn.remove());
+    };
+
+    const markDeleted = (messageId) => {
+        const li = messagesEl.querySelector(`li[data-message-id="${messageId}"]`);
+        if (li && !li.classList.contains('deleted')) {
+            applyDeleted(li);
+        }
+    };
+
+    const deleteMessage = async (messageId) => {
+        if (!globalThis.confirm('Delete this message for everyone?')) {
+            return;
+        }
+        try {
+            const resp = await fetch(`/api/chats/${publicId}/messages/${messageId}`, {
+                method: 'DELETE',
+                headers: apiHeaders(),
+                credentials: 'same-origin',
+            });
+            if (!resp.ok) {
+                throw new Error(`delete ${resp.status}`);
+            }
+            markDeleted(messageId);
+        } catch (e) {
+            console.error('Could not delete the message', e);
+            setStatus('error', 'Could not delete the message');
+        }
+    };
+
+    const buildDeleteButton = (m) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'delete-btn';
+        btn.title = 'Delete';
+        btn.setAttribute('aria-label', 'Delete this message for everyone');
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('aria-hidden', 'true');
+        const lid = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        lid.setAttribute('d', 'M3 6h18M8 6V4h8v2');
+        const can = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        can.setAttribute('d', 'M19 6l-1 14H6L5 6');
+        svg.append(lid, can);
+        btn.appendChild(svg);
+        btn.addEventListener('click', () => deleteMessage(m.id));
+        return btn;
+    };
+
     const buildAuthorshipBadge = (status) => {
         if (status === 'unsigned') {
             return null;
@@ -662,6 +725,9 @@ const initChat = async (root) => {
         const meta = document.createElement('span');
         meta.className = 'msg-meta';
         meta.append(time, buildReplyButton(m, body));
+        if (m.participantId === meId) {
+            meta.appendChild(buildDeleteButton(m));
+        }
 
         const bodyEl = document.createElement('span');
         bodyEl.className = 'body';
@@ -692,6 +758,14 @@ const initChat = async (root) => {
         if (li) {
             messagesEl.appendChild(li);
         }
+    };
+
+    const buildDeletedMessageEl = (m) => {
+        const li = createMessageEl(m, '', 'unsigned');
+        if (li) {
+            applyDeleted(li);
+        }
+        return li;
     };
 
     const NEAR_BOTTOM_PX = 120;
@@ -756,6 +830,13 @@ const initChat = async (root) => {
                     }
                     continue;
                 }
+                if (m.type === 'deleted') {
+                    const li = buildDeletedMessageEl(m);
+                    if (li) {
+                        fragment.appendChild(li);
+                    }
+                    continue;
+                }
                 try {
                     const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
                     const resolved = await resolveMessage(m, plaintext);
@@ -787,6 +868,18 @@ const initChat = async (root) => {
     });
 
     const decryptAndRender = async (m) => {
+        if (m.type === 'deleted') {
+            const stick = isNearBottom();
+            const li = buildDeletedMessageEl(m);
+            if (li) {
+                messagesEl.appendChild(li);
+                if (stick) {
+                    scrollToBottom();
+                }
+                updateScrollButton();
+            }
+            return;
+        }
         if (m.type === 'joined') {
             const stick = isNearBottom();
             const li = buildSystemNoteEl(m);
@@ -955,6 +1048,8 @@ const initChat = async (root) => {
             updatePresence(ev.online || []);
         } else if (ev.type === 'typing') {
             handleTyping(ev.participant, ev.typing);
+        } else if (ev.type === 'deleted') {
+            markDeleted(ev.messageId);
         }
     };
 

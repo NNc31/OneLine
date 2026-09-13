@@ -5,6 +5,7 @@ import com.nefodov.oneline.config.OneLineProperties;
 import com.nefodov.oneline.exception.NotFoundException;
 import com.nefodov.oneline.exception.TooManyRequestsException;
 import com.nefodov.oneline.message.Message;
+import com.nefodov.oneline.message.MessageDeletedEvent;
 import com.nefodov.oneline.message.MessageService;
 import com.nefodov.oneline.message.dto.MessageResponse;
 import com.nefodov.oneline.ratelimit.RateLimiter;
@@ -13,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
@@ -82,6 +84,16 @@ public class ChatApiController {
                                          @AuthenticationPrincipal ChatSession session) {
         verifyChat(publicId, session);
         return messageService.history(session, before, limit).stream().map(this::toResponse).toList();
+    }
+
+    @DeleteMapping("/{publicId}/messages/{messageId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMessage(@PathVariable("publicId") UUID publicId,
+                              @PathVariable("messageId") Long messageId,
+                              @AuthenticationPrincipal ChatSession session) {
+        verifyChat(publicId, session);
+        messageService.delete(session, messageId);
+        eventPublisher.publishEvent(new MessageDeletedEvent(session.chat().getId(), messageId));
     }
 
     private void verifyChat(UUID publicId, ChatSession session) {
