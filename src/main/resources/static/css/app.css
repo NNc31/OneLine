@@ -573,6 +573,11 @@ body.chat-page {
     font-style: italic;
 }
 
+.message .quote-deleted .quote-snippet {
+    font-style: italic;
+    opacity: 0.75;
+}
+
 .message.mine .deleted-body { color: rgba(255, 255, 255, 0.75); }
 
 .message .quote {

@@ -561,9 +561,30 @@ const initChat = async (root) => {
         highlightMessage(target);
     };
 
+    const DELETED_TEXT = 'Message deleted';
+    const deletedMessageIds = new Set();
+
+    const applyQuoteDeleted = (quote) => {
+        quote.classList.add('quote-deleted');
+        const snippet = quote.querySelector('.quote-snippet');
+        if (snippet) {
+            snippet.textContent = DELETED_TEXT;
+        }
+    };
+
+    const registerDeleted = (messageId) => {
+        const id = String(messageId);
+        if (deletedMessageIds.has(id)) {
+            return;
+        }
+        deletedMessageIds.add(id);
+        messagesEl.querySelectorAll(`.quote[data-quote-to="${id}"]`).forEach(applyQuoteDeleted);
+    };
+
     const buildQuoteEl = (payload) => {
         const quote = document.createElement('span');
         quote.className = 'quote';
+        quote.dataset.quoteTo = String(payload.to);
         quote.setAttribute('role', 'button');
         quote.tabIndex = 0;
         quote.title = 'Go to the original message';
@@ -577,6 +598,9 @@ const initChat = async (root) => {
         snippet.textContent = payload.snippet || '';
 
         quote.append(author, snippet);
+        if (deletedMessageIds.has(String(payload.to))) {
+            applyQuoteDeleted(quote);
+        }
         const go = () => jumpToMessage(payload.to);
         quote.addEventListener('click', go);
         quote.addEventListener('keydown', (e) => {
@@ -619,12 +643,13 @@ const initChat = async (root) => {
         if (bodyEl) {
             bodyEl.replaceChildren();
             bodyEl.className = 'body deleted-body';
-            bodyEl.textContent = 'Message deleted';
+            bodyEl.textContent = DELETED_TEXT;
         }
         li.querySelectorAll('.reply-btn, .delete-btn').forEach((btn) => btn.remove());
     };
 
     const markDeleted = (messageId) => {
+        registerDeleted(messageId);
         const li = messagesEl.querySelector(`li[data-message-id="${messageId}"]`);
         if (li && !li.classList.contains('deleted')) {
             applyDeleted(li);
@@ -753,19 +778,30 @@ const initChat = async (root) => {
         return li;
     };
 
-    const renderMessage = (m, body, status) => {
-        const li = createMessageEl(m, body, status);
-        if (li) {
-            messagesEl.appendChild(li);
-        }
-    };
-
     const buildDeletedMessageEl = (m) => {
+        registerDeleted(m.id);
         const li = createMessageEl(m, '', 'unsigned');
         if (li) {
             applyDeleted(li);
         }
         return li;
+    };
+
+    const buildHistoryEl = async (m) => {
+        if (m.type === 'joined') {
+            return buildSystemNoteEl(m);
+        }
+        if (m.type === 'deleted') {
+            return buildDeletedMessageEl(m);
+        }
+        try {
+            const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
+            const resolved = await resolveMessage(m, plaintext);
+            return createMessageEl(m, resolved.body, resolved.status);
+        } catch (e) {
+            console.error('Skipping undecryptable message', m.id, e);
+            return null;
+        }
     };
 
     const NEAR_BOTTOM_PX = 120;
@@ -823,29 +859,9 @@ const initChat = async (root) => {
             const prevTop = messagesEl.scrollTop;
             const fragment = document.createDocumentFragment();
             for (const m of batch.slice().reverse()) {
-                if (m.type === 'joined') {
-                    const li = buildSystemNoteEl(m);
-                    if (li) {
-                        fragment.appendChild(li);
-                    }
-                    continue;
-                }
-                if (m.type === 'deleted') {
-                    const li = buildDeletedMessageEl(m);
-                    if (li) {
-                        fragment.appendChild(li);
-                    }
-                    continue;
-                }
-                try {
-                    const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
-                    const resolved = await resolveMessage(m, plaintext);
-                    const li = createMessageEl(m, resolved.body, resolved.status);
-                    if (li) {
-                        fragment.appendChild(li);
-                    }
-                } catch (e) {
-                    console.error('Skipping undecryptable message', m.id, e);
+                const li = await buildHistoryEl(m);
+                if (li) {
+                    fragment.appendChild(li);
                 }
             }
             messagesEl.insertBefore(fragment, messagesEl.firstChild);
@@ -868,45 +884,18 @@ const initChat = async (root) => {
     });
 
     const decryptAndRender = async (m) => {
-        if (m.type === 'deleted') {
-            const stick = isNearBottom();
-            const li = buildDeletedMessageEl(m);
-            if (li) {
-                messagesEl.appendChild(li);
-                if (stick) {
-                    scrollToBottom();
-                }
-                updateScrollButton();
-            }
-            return;
-        }
-        if (m.type === 'joined') {
-            const stick = isNearBottom();
-            const li = buildSystemNoteEl(m);
-            if (li) {
-                messagesEl.appendChild(li);
-                if (stick) {
-                    scrollToBottom();
-                }
-                updateScrollButton();
-            }
-            return;
-        }
-        try {
-            const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
-            const resolved = await resolveMessage(m, plaintext);
-            const isNew = !seenMessageIds.has(m.id);
-            const stick = isNearBottom() || m.participantId === meId;
-            renderMessage(m, resolved.body, resolved.status);
+        const isNew = !seenMessageIds.has(m.id);
+        const stick = isNearBottom() || (m.type === 'chat' && m.participantId === meId);
+        const li = await buildHistoryEl(m);
+        if (li) {
+            messagesEl.appendChild(li);
             if (stick) {
                 scrollToBottom();
             }
             updateScrollButton();
-            if (isNew && m.participantId !== meId && globalThis.OneLineSound) {
-                globalThis.OneLineSound.play();
-            }
-        } catch (e) {
-            console.error('Decrypt failed for message', m.id, e);
+        }
+        if (isNew && m.type === 'chat' && m.participantId !== meId) {
+            globalThis.OneLineSound?.play();
         }
     };
 
@@ -956,19 +945,9 @@ const initChat = async (root) => {
             }
             const history = await resp.json();
             for (const m of history.slice().reverse()) {
-                if (m.type === 'joined') {
-                    const li = buildSystemNoteEl(m);
-                    if (li) {
-                        messagesEl.appendChild(li);
-                    }
-                    continue;
-                }
-                try {
-                    const plaintext = await OneLineCrypto.decrypt(cryptoKey, m.content);
-                    const resolved = await resolveMessage(m, plaintext);
-                    renderMessage(m, resolved.body, resolved.status);
-                } catch (e) {
-                    console.error('Skipping undecryptable message', m.id, e);
+                const li = await buildHistoryEl(m);
+                if (li) {
+                    messagesEl.appendChild(li);
                 }
             }
             if (history.length > 0) {
