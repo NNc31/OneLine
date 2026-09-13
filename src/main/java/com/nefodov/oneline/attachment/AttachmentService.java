@@ -93,7 +93,19 @@ public class AttachmentService {
 
     @Transactional
     public void discard(ChatSession session, Long attachmentId) {
+        remove(require(session, attachmentId));
+    }
+
+    @Transactional
+    public void deleteOwn(ChatSession session, Long attachmentId) {
         Attachment attachment = require(session, attachmentId);
+        if (!attachment.getParticipant().getId().equals(session.participant().getId())) {
+            throw new NotFoundException("Attachment not found");
+        }
+        remove(attachment);
+    }
+
+    private void remove(Attachment attachment) {
         List<String> keys = new ArrayList<>(attachment.getChunks().stream().map(AttachmentChunk::getObjectKey).toList());
         if (attachment.getObjectKey() != null) {
             keys.add(attachment.getObjectKey());

@@ -3,6 +3,7 @@ package com.nefodov.oneline.message;
 import com.nefodov.oneline.chat.Chat;
 import com.nefodov.oneline.chat.ChatParticipant;
 import com.nefodov.oneline.chat.ChatSession;
+import com.nefodov.oneline.exception.NotFoundException;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,10 @@ import java.util.UUID;
 @Service
 @AllArgsConstructor
 public class MessageService {
+
+    static final String TYPE_CHAT = "chat";
+    static final String TYPE_JOINED = "joined";
+    static final String TYPE_DELETED = "deleted";
 
     private static final int DEFAULT_HISTORY_LIMIT = 50;
     private static final int MAX_HISTORY_LIMIT = 200;
@@ -35,8 +40,25 @@ public class MessageService {
         message.setParticipant(participant);
         message.setClientMessageId(UUID.randomUUID());
         message.setContent(new byte[0]);
-        message.setType("joined");
+        message.setType(TYPE_JOINED);
         return messageRepository.save(message);
+    }
+
+    @Transactional
+    public Message delete(ChatSession session, Long messageId) {
+        Message message = messageRepository.findByIdAndChat(messageId, session.chat()).orElseThrow(() -> new NotFoundException("Message not found"));
+        if (!message.getParticipant().getId().equals(session.participant().getId())) {
+            throw new NotFoundException("Message not found");
+        }
+        if (TYPE_DELETED.equals(message.getType())) {
+            return message;
+        }
+        if (!TYPE_CHAT.equals(message.getType())) {
+            throw new NotFoundException("Message not found");
+        }
+        message.setContent(new byte[0]);
+        message.setType(TYPE_DELETED);
+        return message;
     }
 
     @Transactional

@@ -204,6 +204,43 @@ class AttachmentServiceTest {
     }
 
     @Test
+    @DisplayName("deleteOwn removes the uploader's own attachment")
+    void deleteOwnRemovesAttachment() {
+        Attachment attachment = chunkedAttachment("k0", "k1");
+        when(repository.findByIdAndChat(1L, session.chat())).thenReturn(Optional.of(attachment));
+
+        service.deleteOwn(session, 1L);
+
+        verify(storage).remove(List.of("k0", "k1"));
+        verify(repository).delete(attachment);
+    }
+
+    @Test
+    @DisplayName("deleteOwn reports someone else's attachment as missing and leaves it alone")
+    void deleteOwnRejectsAnotherParticipantsAttachment() {
+        ChatParticipant other = new ChatParticipant();
+        other.setId(9L);
+        other.setChat(session.chat());
+        other.setDisplayName("Alex");
+        Attachment attachment = chunkedAttachment("k0");
+        attachment.setParticipant(other);
+        when(repository.findByIdAndChat(1L, session.chat())).thenReturn(Optional.of(attachment));
+
+        assertThrows(NotFoundException.class, () -> service.deleteOwn(session, 1L));
+        verify(storage, never()).remove(anyCollection());
+        verify(repository, never()).delete(any(Attachment.class));
+    }
+
+    @Test
+    @DisplayName("deleteOwn reports an attachment from another chat as missing")
+    void deleteOwnRejectsForeignAttachment() {
+        when(repository.findByIdAndChat(99L, session.chat())).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> service.deleteOwn(session, 99L));
+        verify(storage, never()).remove(anyCollection());
+    }
+
+    @Test
     @DisplayName("discard removes every chunk object and the row behind it")
     void discardRemovesChunkedAttachment() {
         Attachment attachment = chunkedAttachment("k0", "k1");

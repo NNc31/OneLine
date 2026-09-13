@@ -62,6 +62,14 @@ public class AttachmentController {
         meterRegistry.counter("oneline.attachments.confirmed").increment();
     }
 
+    @DeleteMapping("/{attachmentId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("publicId") UUID publicId, @PathVariable("attachmentId") Long attachmentId, @AuthenticationPrincipal ChatSession session) {
+        verifyChat(publicId, session);
+        attachmentService.deleteOwn(session, attachmentId);
+        meterRegistry.counter("oneline.attachments.deleted").increment();
+    }
+
     @GetMapping("/{attachmentId}")
     public AttachmentDownloadResponse download(@PathVariable("publicId") UUID publicId, @PathVariable("attachmentId") Long attachmentId, @AuthenticationPrincipal ChatSession session) {
         verifyChat(publicId, session);
