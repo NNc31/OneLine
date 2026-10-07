@@ -1,6 +1,6 @@
 package com.nefodov.oneline.attachment;
 
-import com.nefodov.oneline.TestImages;
+import com.nefodov.oneline.S3Container;
 import com.nefodov.oneline.chat.Chat;
 import com.nefodov.oneline.chat.ChatParticipant;
 import com.nefodov.oneline.config.OneLineProperties;
@@ -17,7 +17,6 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.MinIOContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -45,14 +44,14 @@ class AttachmentCleanupServiceTest {
     static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
 
     @Container
-    static final MinIOContainer MINIO = new MinIOContainer(TestImages.MINIO);
+    static final S3Container S3_CONTAINER = new S3Container();
 
     @DynamicPropertySource
     static void storageProperties(DynamicPropertyRegistry registry) {
-        registry.add("oneline.storage.endpoint", MINIO::getS3URL);
-        registry.add("oneline.storage.public-endpoint", MINIO::getS3URL);
-        registry.add("oneline.storage.access-key", MINIO::getUserName);
-        registry.add("oneline.storage.secret-key", MINIO::getPassword);
+        registry.add("oneline.storage.endpoint", S3_CONTAINER::getS3URL);
+        registry.add("oneline.storage.public-endpoint", S3_CONTAINER::getS3URL);
+        registry.add("oneline.storage.access-key", S3_CONTAINER::getUserName);
+        registry.add("oneline.storage.secret-key", S3_CONTAINER::getPassword);
     }
 
     @PersistenceContext

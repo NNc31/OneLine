@@ -9,7 +9,7 @@ runs:
       run: |
         set -uo pipefail
         images=(
-          "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
+          "chrislusf/seaweedfs:3.98"
           "postgres:16"
           "redis:7-alpine"
         )
