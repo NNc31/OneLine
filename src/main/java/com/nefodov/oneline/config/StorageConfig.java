@@ -46,10 +46,10 @@ public class StorageConfig {
             boolean exists = client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
             if (!exists) {
                 client.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
-                log.info("Created MinIO bucket '{}'", bucket);
+                log.info("Created object storage bucket '{}'", bucket);
             }
         } catch (Exception e) {
-            log.warn("Could not create or verify MinIO bucket '{}' at startup", bucket, e);
+            log.warn("Could not create or verify object storage bucket '{}' at startup", bucket, e);
         }
     }
 

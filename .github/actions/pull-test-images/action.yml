@@ -1,0 +1,37 @@
+name: Pull test images
+description: >
+  Fetches the container images the integration tests need before Gradle starts.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -uo pipefail
+        images=(
+          "chrislusf/seaweedfs:3.98"
+          "postgres:16"
+          "redis:7-alpine"
+        )
+
+        for image in "${images[@]}"; do
+          pulled=false
+          for attempt in 1 2 3; do
+            echo "::group::docker pull $image (attempt $attempt)"
+            if timeout 300 docker pull "$image"; then
+              pulled=true
+              echo "::endgroup::"
+              break
+            fi
+            echo "::endgroup::"
+            echo "::warning::Could not pull $image on attempt $attempt"
+            sleep $((attempt * 15))
+          done
+          if [ "$pulled" = false ]; then
+            echo "::error::Giving up on $image after 3 attempts - the registry is unreachable or too slow"
+            exit 1
+          fi
+        done
+
+        echo "All test images are present locally:"
+        docker images --format '  {{.Repository}}:{{.Tag}} ({{.Size}})'

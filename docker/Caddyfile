@@ -10,5 +10,18 @@
 }
 
 {$STORAGE_DOMAIN} {
-    reverse_proxy minio:9000
+        @preflight method OPTIONS
+        handle @preflight {
+            header Access-Control-Allow-Origin "https://{$APP_DOMAIN}"
+            header Access-Control-Allow-Methods "GET, PUT, HEAD"
+            header Access-Control-Allow-Headers "*"
+            header Access-Control-Max-Age "86400"
+            respond 204
+        }
+
+        handle {
+            reverse_proxy s3:9000 {
+                header_down Access-Control-Allow-Origin "https://{$APP_DOMAIN}"
+            }
+        }
 }
