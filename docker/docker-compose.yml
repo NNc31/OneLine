@@ -32,24 +32,27 @@ services:
       retries: 10
     logging: *default-logging
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: oneline-minio
-    command: ["server", "/data", "--console-address", ":9001"]
+  s3:
+    image: chrislusf/seaweedfs:3.98
+    container_name: oneline-s3
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat > /tmp/s3.json <<EOF
+        {"identities":[{"name":"oneline","credentials":[{"accessKey":"$${S3_ACCESS_KEY}","secretKey":"$${S3_SECRET_KEY}"}],"actions":["Admin","Read","Write","List","Tagging"]}]}
+        EOF
+        exec weed server -dir=/data -s3 -s3.port=9000 -s3.config=/tmp/s3.json -s3.allowedOrigins=http://localhost:8080
     environment:
-      MINIO_ROOT_USER: oneline
-      MINIO_ROOT_PASSWORD: oneline_secret
+      S3_ACCESS_KEY: oneline
+      S3_SECRET_KEY: oneline_secret
     volumes:
-      - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      - s3_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "mc ready local"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 || exit 1"]
       interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 12
+      start_period: 15s
     logging: *default-logging
 
   app:
@@ -62,7 +65,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      s3:
         condition: service_healthy
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/oneline_db
@@ -70,16 +73,28 @@ services:
       DB_PASSWORD: oneline_pass
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
-      MINIO_ACCESS_KEY: oneline
-      MINIO_SECRET_KEY: oneline_secret
+      S3_ENDPOINT: http://s3:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_ACCESS_KEY: oneline
+      S3_SECRET_KEY: oneline_secret
       ONELINE_ATTACHMENTS_ENABLED: "${ONELINE_ATTACHMENTS_ENABLED:-true}"
     ports:
       - "8080:8080"
       - "8081:8081"
     logging: *default-logging
 
+  storage-proxy:
+    image: caddy:2-alpine
+    container_name: oneline-storage-proxy
+    depends_on:
+      s3:
+        condition: service_healthy
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+    ports:
+      - "9000:9000"
+    logging: *default-logging
+
 volumes:
   pg_data:
-  minio_data:
+  s3_data:

@@ -34,22 +34,28 @@ services:
       retries: 10
     logging: *default-logging
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: oneline-minio
+  s3:
+    image: chrislusf/seaweedfs:3.98
+    container_name: oneline-s3
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        cat > /tmp/s3.json <<EOF
+        {"identities":[{"name":"oneline","credentials":[{"accessKey":"$${S3_ACCESS_KEY}","secretKey":"$${S3_SECRET_KEY}"}],"actions":["Admin","Read","Write","List","Tagging"]}]}
+        EOF
+        exec weed server -dir=/data -s3 -s3.port=9000 -s3.config=/tmp/s3.json -s3.allowedOrigins=https://${APP_DOMAIN:?}
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
     volumes:
-      - minio_data:/data
+      - s3_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "mc ready local"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 || exit 1"]
       interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 12
+      start_period: 15s
     logging: *default-logging
 
   app:
@@ -63,7 +69,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      s3:
         condition: service_healthy
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/oneline_db
@@ -71,10 +77,10 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_ENDPOINT: https://${STORAGE_DOMAIN:?}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:?}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:?}
+      S3_ENDPOINT: http://s3:9000
+      S3_PUBLIC_ENDPOINT: https://${STORAGE_DOMAIN:?}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?}
       ONELINE_ATTACHMENTS_ENABLED: "${ONELINE_ATTACHMENTS_ENABLED:-true}"
       SERVER_FORWARD_HEADERS_STRATEGY: framework
     ports:
@@ -87,7 +93,7 @@ services:
     restart: unless-stopped
     depends_on:
       - app
-      - minio
+      - s3
     ports:
       - "80:80"
       - "443:443"
@@ -104,6 +110,6 @@ services:
 
 volumes:
   pg_data:
-  minio_data:
+  s3_data:
   caddy_data:
   caddy_config:
